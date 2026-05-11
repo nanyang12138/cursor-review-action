@@ -1,0 +1,19 @@
+model: auto
+language: zh-CN
+review_focus:
+  - correctness
+  - security
+  - performance
+  - tests
+  - edge-cases
+max_findings: 5
+max_diff_bytes: 120000
+filter_mode: added
+persistent_comment: true
+enabled_commands:
+  - review
+include_patterns: []
+exclude_patterns:
+  - "*.lock"
+  - "dist/**"
+  - "build/**"
