@@ -1,46 +1,89 @@
 # Cursor Review Action
 
-Reusable GitHub Action for Cursor-powered pull request review.
+A lightweight Cursor CLI powered pull request review bot for GitHub Actions.
 
-This action is a lightweight alternative when Cursor Bugbot cannot be enabled for a repository. It runs Cursor CLI in GitHub Actions, reviews the PR diff, and creates or updates a PR comment.
+Use this action when you want Cursor to review GitHub PRs, but you cannot enable Cursor Bugbot for the repository, do not have organization admin access, or want a simple workflow-based review bot that you can fully control.
 
-## Features
+It installs Cursor CLI inside GitHub Actions, reviews the PR diff, and creates or updates a PR comment.
 
-- PR automatic review on `opened`, `synchronize`, and `reopened`.
-- Manual review by commenting `/cursor-review` on a PR.
-- Extra instructions after `/cursor-review` are passed into the review prompt.
-- Repo-local `.cursor-review.yml` configuration.
-- Model selection through the `model` input.
-- Diff filtering with include/exclude patterns.
-- Large diff truncation with diagnostics.
-- Persistent PR comment updates to avoid comment spam.
-- Structured findings output for future inline comment support.
-- Safe default behavior: only `review` is enabled by default.
+## Why This Exists
 
-## Quick Start
+Cursor Bugbot is the official PR review product, but it requires the GitHub App to be installed and the repository to be enabled by the right admin. That is not always possible.
 
-1. Add a repository secret named `CURSOR_API_KEY`.
-2. Copy [`examples/cursor-review.yml`](examples/cursor-review.yml) to:
+PR-Agent is a mature open-source AI review system with many features, but it is a larger framework with its own provider and configuration model.
+
+This action is intentionally smaller:
+
+- It is Cursor-native: it uses Cursor CLI and your `CURSOR_API_KEY`.
+- It does not require a GitHub App installation.
+- It works with normal GitHub Actions workflows.
+- It supports automatic PR review and manual `/cursor-review` comments.
+- It lets reviewers add extra prompt instructions directly in a PR comment.
+- It is easy to copy into personal repos, prototypes, and small team repos.
+
+## What It Can Do
+
+- Automatically review PRs when they are opened, updated, or reopened.
+- Manually review a PR by commenting `/cursor-review`.
+- Accept extra instructions after `/cursor-review`.
+- Use a repo-local `.cursor-review.yml` configuration file.
+- Select a Cursor model with the `model` input.
+- Filter files with include/exclude patterns.
+- Truncate very large diffs and explain that the review is partial.
+- Update the previous Cursor review comment instead of creating comment spam.
+- Output diagnostics for permissions, model, diff size, and Cursor CLI failures.
+
+## Requirements
+
+You need these in each repository that wants to use the action:
+
+1. GitHub Actions enabled.
+2. Permission to add a workflow file under `.github/workflows/`.
+3. A GitHub Actions secret named `CURSOR_API_KEY`.
+4. Workflow permissions that allow PR comments:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+```
+
+For repository settings, check:
+
+```text
+Repository -> Settings -> Actions -> General -> Workflow permissions
+```
+
+If your organization forces read-only workflow tokens, the review can still run, but the action may fail to comment on the PR.
+
+## Step 1: Create a Cursor API Key
+
+Create a Cursor API key from your Cursor dashboard, then store it as a GitHub Actions secret.
+
+In your target GitHub repository:
+
+```text
+Settings -> Secrets and variables -> Actions -> New repository secret
+```
+
+Use this exact name:
+
+```text
+CURSOR_API_KEY
+```
+
+Do not put the real key in your workflow file, PR comment, issue, or README.
+
+## Step 2: Add the Workflow
+
+Create this file in the target repository:
 
 ```text
 .github/workflows/cursor-review.yml
 ```
 
-3. Commit the workflow to the default branch.
-4. Open or update a PR, or comment:
-
-```text
-/cursor-review
-```
-
-With extra prompt:
-
-```text
-/cursor-review
-Focus only on architecture boundaries and missing tests.
-```
-
-## Minimal Caller Workflow
+Copy this workflow:
 
 ```yaml
 name: Cursor Code Review
@@ -55,6 +98,9 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   cursor-review:
@@ -96,7 +142,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cursor review
-        uses: nanyang12138/cursor-review-action@v1
+        uses: nanyang12138/cursor-review-action@main
         with:
           cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
           github-token: ${{ github.token }}
@@ -109,9 +155,45 @@ jobs:
           language: zh-CN
 ```
 
-## Repo Configuration
+Until the first stable release is published, use:
 
-Create `.cursor-review.yml` in the target repository:
+```yaml
+uses: nanyang12138/cursor-review-action@main
+```
+
+After `v1` is released, prefer:
+
+```yaml
+uses: nanyang12138/cursor-review-action@v1
+```
+
+## Step 3: Trigger a Review
+
+Automatic review runs when a PR is:
+
+- opened
+- updated with new commits
+- reopened
+
+Manual review runs when a trusted user comments on the PR conversation:
+
+```text
+/cursor-review
+```
+
+You can add extra instructions:
+
+```text
+/cursor-review
+Focus on architecture boundaries, missing tests, and risky edge cases.
+Do not summarize the whole PR.
+```
+
+The text after `/cursor-review` is passed to Cursor as additional review instructions.
+
+## Optional: Add Repo Configuration
+
+Create `.cursor-review.yml` in the target repository if you want repo-specific defaults.
 
 ```yaml
 model: auto
@@ -141,34 +223,75 @@ Configuration precedence:
 PR comment prompt > .cursor-review.yml > workflow inputs > action defaults
 ```
 
+## Common Customizations
+
+Change output language:
+
+```yaml
+with:
+  language: en
+```
+
+Use a specific model:
+
+```yaml
+with:
+  model: auto
+```
+
+Limit reviewed files:
+
+```yaml
+with:
+  include-patterns: "src/**,packages/**"
+  exclude-patterns: "*.lock,dist/**,build/**"
+```
+
+Disable PR comments and only print the result in the Actions summary:
+
+```yaml
+with:
+  comment-mode: off
+```
+
+Create a new comment every time instead of updating the previous one:
+
+```yaml
+with:
+  persistent-comment: false
+  comment-mode: create
+```
+
 ## Inputs
 
 Important inputs:
 
-- `cursor-api-key`: required Cursor API key.
-- `github-token`: GitHub token used for PR comment update.
+- `cursor-api-key`: Required. Cursor API key, usually `${{ secrets.CURSOR_API_KEY }}`.
+- `github-token`: Token used to create or update PR comments, usually `${{ github.token }}`.
 - `base-sha` / `head-sha`: PR diff range.
 - `pr-number`: PR number for comment output.
-- `comment-body`: PR comment body, used to extract extra instructions.
-- `model`: Cursor model, default `auto`.
-- `language`: output language, default `zh-CN`.
-- `max-findings`: maximum actionable findings, default `5`.
-- `max-diff-bytes`: maximum diff size sent to Cursor, default `120000`.
+- `event-name`: GitHub event name.
+- `comment-body`: PR comment body used to extract extra instructions.
+- `model`: Cursor model. Default: `auto`.
+- `language`: Output language. Default: `zh-CN`.
+- `review-focus`: Comma-separated review focus list.
+- `max-findings`: Maximum actionable findings. Default: `5`.
+- `max-diff-bytes`: Maximum diff size sent to Cursor. Default: `120000`.
 - `filter-mode`: `added`, `diff_context`, or `file`.
-- `include-patterns` / `exclude-patterns`: comma-separated file globs.
-- `persistent-comment`: update previous review comment, default `true`.
+- `include-patterns` / `exclude-patterns`: Comma-separated file globs.
+- `persistent-comment`: Update the previous Cursor review comment. Default: `true`.
 - `comment-mode`: `update`, `create`, or `off`.
-- `fail-on-error`: fail the job when Cursor review fails, default `false`.
+- `fail-on-error`: Fail the job when Cursor review fails. Default: `false`.
 
 ## Commands
 
-Default enabled command:
+Enabled by default:
 
 ```text
 /cursor-review
 ```
 
-Reserved commands:
+Reserved for future use:
 
 ```text
 /cursor-ask
@@ -176,50 +299,98 @@ Reserved commands:
 /cursor-describe
 ```
 
-These are intentionally disabled by default. Enable them later through `enabled_commands` once their behavior is validated.
+Only `/cursor-review` is enabled by default. The other commands are intentionally reserved until their behavior is validated.
 
-## Model Selection
+## Security Model
 
-Use `auto` unless you know your Cursor account supports a specific model.
+- Never hardcode `CURSOR_API_KEY` in workflow files.
+- Keep GitHub token permissions minimal.
+- Restrict comment-triggered runs to trusted users.
+- Treat PR comments and diff content as untrusted prompt input.
+- The action passes comment text to Cursor as prompt text only; it does not execute comment text as shell.
 
-```yaml
-with:
-  model: auto
+The example workflow restricts manual triggers to:
+
+```text
+OWNER, MEMBER, COLLABORATOR
 ```
-
-To inspect available models in a separate debug workflow, run:
-
-```bash
-agent models
-```
-
-## Security Notes
-
-- Do not hardcode `CURSOR_API_KEY` in workflow files.
-- Keep `permissions` minimal: `contents: read`, `pull-requests: write`, `issues: write`.
-- Restrict comment-triggered runs to trusted users such as `OWNER`, `MEMBER`, or `COLLABORATOR`.
-- PR comment text and diff content are treated as untrusted prompt input and are never executed as shell.
 
 ## Troubleshooting
 
-`Resource not accessible by integration`
+### `Resource not accessible by integration`
 
-- Ensure workflow permissions include `issues: write` and `pull-requests: write`.
-- Check repository settings: Actions workflow permissions may need read/write access.
+The workflow token cannot create or update PR comments.
 
-`Cursor CLI agent was not found`
+Check the workflow has:
 
-- Keep `install-cursor: true`, or install Cursor CLI before calling the action.
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+```
 
-`401` or auth failure
+Also check repository settings:
 
-- Confirm `CURSOR_API_KEY` is valid and stored as a GitHub Actions secret.
+```text
+Settings -> Actions -> General -> Workflow permissions
+```
 
-Review comment says diff was truncated
+### Manual `/cursor-review` does not trigger
 
-- Increase `max-diff-bytes`, or narrow review scope with `include-patterns`.
+Common causes:
 
-Manual `/cursor-review` does not trigger
+- The workflow file is not on the default branch.
+- The comment was not posted on the PR conversation.
+- The commenter is not `OWNER`, `MEMBER`, or `COLLABORATOR`.
+- The workflow condition was changed and no longer matches `/cursor-review`.
 
-- The workflow must exist on the default branch for `issue_comment` events.
-- The comment must be on the PR conversation, not only a file review thread.
+### `Cursor CLI agent was not found`
+
+Keep this input enabled:
+
+```yaml
+with:
+  install-cursor: true
+```
+
+It is enabled by default.
+
+### `401`, `Unauthorized`, or authentication failure
+
+Check that:
+
+- `CURSOR_API_KEY` exists in repository secrets.
+- The key is valid.
+- The key was not revoked.
+- The key was not pasted with extra spaces.
+
+### Review says the diff was truncated
+
+The PR diff was larger than `max-diff-bytes`.
+
+Options:
+
+- Increase `max-diff-bytes`.
+- Narrow scope with `include-patterns`.
+- Exclude generated files with `exclude-patterns`.
+- Split the PR.
+
+## Limitations
+
+- This is not Cursor Bugbot. It is a GitHub Actions based integration.
+- Very large PRs may be partially reviewed if the diff is truncated.
+- Inline comments are not enabled yet.
+- `/cursor-ask`, `/cursor-improve`, and `/cursor-describe` are reserved but disabled by default.
+
+## When to Use This
+
+Use this action if:
+
+- You want Cursor-powered PR review.
+- You cannot enable Cursor Bugbot.
+- You do not have GitHub organization admin permissions.
+- You want a simple workflow-based review bot.
+- You want reviewers to guide the review through `/cursor-review` comments.
+
+If you need a mature multi-provider review framework with many built-in commands, PR-Agent may be a better fit. If you need the official Cursor PR review product and can enable it, Cursor Bugbot is the preferred option.

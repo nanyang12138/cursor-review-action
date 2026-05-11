@@ -54,7 +54,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cursor review
-        uses: nanyang12138/cursor-review-action@v1
+        uses: nanyang12138/cursor-review-action@main
         with:
           cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
           github-token: ${{ github.token }}
