@@ -75,13 +75,15 @@ CURSOR_API_KEY
 
 Do not put the real key in your workflow file, PR comment, issue, or README.
 
-## Step 2: Add the Workflow
+## Step 2: Add the Required Workflow File
 
 Create this file in the target repository:
 
 ```text
 .github/workflows/cursor-review.yml
 ```
+
+This is the GitHub Actions workflow file. It tells GitHub when to run Cursor Review Action, which permissions it needs, and how PR or `/cursor-review` comment events should trigger it.
 
 Copy this workflow:
 
@@ -191,9 +193,16 @@ Do not summarize the whole PR.
 
 The text after `/cursor-review` is passed to Cursor as additional review instructions.
 
-## Optional: Add Repo Configuration
+## Optional: Add a Repo Configuration File
 
 Create `.cursor-review.yml` in the target repository if you want repo-specific defaults.
+
+This file is different from `.github/workflows/cursor-review.yml`.
+
+- `.github/workflows/cursor-review.yml` is required. It starts the action.
+- `.cursor-review.yml` is optional. It customizes how the action reviews PRs in this repository.
+
+You can skip `.cursor-review.yml` if the default settings are enough.
 
 ```yaml
 model: auto
