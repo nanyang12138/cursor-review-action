@@ -120,6 +120,9 @@ outputs:
   diff-truncated:
     description: "Whether the diff was truncated."
     value: ${{ steps.review.outputs.diff_truncated }}
+  resolved-command:
+    description: "Resolved command: review, ask, improve, or describe."
+    value: ${{ steps.review.outputs.resolved_command }}
   comment-url:
     description: "Created or updated PR comment URL."
     value: ${{ steps.comment.outputs.comment_url }}
@@ -166,16 +169,25 @@ runs:
       env:
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         REVIEW_BODY: ${{ steps.review.outputs.summary }}
+        RESOLVED_COMMAND: ${{ steps.review.outputs.resolved_command }}
         PR_NUMBER: ${{ inputs.pr-number }}
         PERSISTENT_COMMENT: ${{ inputs.persistent-comment }}
         COMMENT_MODE: ${{ inputs.comment-mode }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const marker = '<!-- cursor-review-action -->';
+          const rawCommand = process.env.RESOLVED_COMMAND || 'review';
+          const command = rawCommand.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'review';
+          const marker = `<!-- cursor-review-action:${command} -->`;
+          const titles = {
+            review: 'Cursor Review',
+            ask: 'Cursor Ask',
+            improve: 'Cursor Improve',
+            describe: 'Cursor Describe'
+          };
           const prNumber = Number(process.env.PR_NUMBER);
           const reviewBody = process.env.REVIEW_BODY || 'Cursor review produced no output.';
-          const body = `${marker}\n## Cursor Review\n\n${reviewBody}`;
+          const body = `${marker}\n## ${titles[command] || `Cursor ${command}`}\n\n${reviewBody}`;
           const persistent = process.env.PERSISTENT_COMMENT === 'true' || process.env.COMMENT_MODE === 'update';
 
           let comment = null;

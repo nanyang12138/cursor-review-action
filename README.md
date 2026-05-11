@@ -283,6 +283,8 @@ with:
   comment-mode: create
 ```
 
+By default, persistent comments are tracked separately per command. For example, `/cursor-review` updates the latest Cursor Review comment, while `/cursor-ask` updates the latest Cursor Ask comment instead of overwriting the review result.
+
 ## Inputs
 
 Important inputs:
@@ -300,7 +302,7 @@ Important inputs:
 - `max-diff-bytes`: Maximum diff size sent to Cursor. Default: `120000`.
 - `filter-mode`: `added`, `diff_context`, or `file`.
 - `include-patterns` / `exclude-patterns`: Comma-separated file globs.
-- `persistent-comment`: Update the previous Cursor review comment. Default: `true`.
+- `persistent-comment`: Update the previous comment for the same command. Default: `true`.
 - `comment-mode`: `update`, `create`, or `off`.
 - `fail-on-error`: Fail the job when Cursor review fails. Default: `false`.
 

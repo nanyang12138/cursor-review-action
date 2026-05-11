@@ -434,6 +434,7 @@ def main() -> int:
     settings = load_settings()
     command, user_prompt = derive_command_and_prompt(settings)
     settings["resolved_command"] = command
+    set_output("resolved_command", command)
 
     enabled, message = ensure_command_enabled(command, settings)
     if not enabled:
