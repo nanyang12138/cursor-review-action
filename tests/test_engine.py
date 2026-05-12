@@ -98,6 +98,65 @@ exclude_patterns: ["dist/**", "*.lock"]
         self.assertEqual(loaded["enabled_commands"], ["review", "ask"])
         self.assertEqual(loaded["exclude_patterns"], ["dist/**", "*.lock"])
 
+    def test_load_settings_reads_pr_metadata_inputs(self) -> None:
+        env = {
+            "INPUT_PR_NUMBER": "42",
+            "INPUT_PR_TITLE": "Add safer parser",
+            "INPUT_PR_BODY": "Implements parser guardrails.",
+            "INPUT_BASE_REF": "main",
+            "INPUT_HEAD_REF": "feature/parser",
+            "INPUT_COMMIT_MESSAGES": "Add parser\nAdd tests",
+        }
+
+        with mock.patch.dict(os.environ, env, clear=True):
+            settings = config.load_settings()
+
+        self.assertEqual(settings["pr_title"], "Add safer parser")
+        self.assertEqual(settings["pr_body"], "Implements parser guardrails.")
+        self.assertEqual(settings["base_ref"], "main")
+        self.assertEqual(settings["head_ref"], "feature/parser")
+        self.assertEqual(settings["commit_messages"], "Add parser\nAdd tests")
+
+
+class ContextBuilderTests(unittest.TestCase):
+    def test_build_review_context_adds_structured_pr_metadata(self) -> None:
+        settings = {
+            "pr_number": "42",
+            "pr_title": "Add safer parser",
+            "pr_body": "Implements parser guardrails.",
+            "base_ref": "main",
+            "head_ref": "feature/parser",
+            "event_name": "pull_request",
+            "resolved_command": "review",
+            "resolved_user_prompt": "Focus on tests.",
+            "commit_messages": "Add parser\nAdd tests",
+            "config_loaded": ".cursor-review.yml",
+        }
+        diff_meta = {
+            "base": "base-sha",
+            "head": "head-sha",
+            "range": "base-sha...head-sha",
+            "files": ["scripts/engine/parser.py", "tests/test_engine.py"],
+        }
+
+        with mock.patch.object(
+            context,
+            "build_diff",
+            return_value=("diff --git a/a.py b/a.py", " parser.py | 2 +", False, diff_meta),
+        ):
+            review_context = context.build_review_context(settings)
+
+        pr_context = review_context.meta["pull_request_context"]
+        self.assertEqual(pr_context["pr_number"], "42")
+        self.assertEqual(pr_context["title"], "Add safer parser")
+        self.assertEqual(pr_context["body"], "Implements parser guardrails.")
+        self.assertEqual(pr_context["base_ref"], "main")
+        self.assertEqual(pr_context["head_ref"], "feature/parser")
+        self.assertEqual(pr_context["commit_messages"], ["Add parser", "Add tests"])
+        self.assertEqual(pr_context["changed_files"], ["scripts/engine/parser.py", "tests/test_engine.py"])
+        self.assertEqual(pr_context["diff_stat"], "parser.py | 2 +")
+        self.assertEqual(pr_context["comment_prompt"], "Focus on tests.")
+
 
 class PromptParserRenderTests(unittest.TestCase):
     def test_build_prompt_preserves_response_contract_and_diagnostics(self) -> None:
@@ -122,6 +181,42 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Additional user instructions from PR comment", prompt)
         self.assertIn("<review_markdown>", prompt)
         self.assertIn('"diff_truncated": false', prompt)
+
+    def test_build_prompt_includes_pull_request_context(self) -> None:
+        settings = {
+            "language": "en",
+            "max_findings": 5,
+            "review_focus": "correctness",
+            "model": "auto",
+            "config_loaded": "",
+        }
+        meta = {
+            "files": ["a.py"],
+            "pull_request_context": {
+                "pr_number": "42",
+                "title": "Add safer parser",
+                "body": "Parser guardrails.",
+                "base_ref": "main",
+                "head_ref": "feature/parser",
+                "commit_messages": ["Add parser"],
+                "changed_files": ["a.py"],
+                "diff_stat": "a.py | 1 +",
+            },
+        }
+
+        prompt = prompts.build_prompt(
+            "review",
+            "",
+            "diff --git a/a.py b/a.py",
+            " a.py | 1 +",
+            False,
+            meta,
+            settings,
+        )
+
+        self.assertIn("Pull request context:", prompt)
+        self.assertIn('"title": "Add safer parser"', prompt)
+        self.assertIn('"commit_messages": [', prompt)
 
     def test_parse_agent_output_formats_valid_findings_json(self) -> None:
         raw = """
@@ -162,6 +257,30 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("No issues.", rendered)
         self.assertIn("Diff truncated: `true`", rendered)
         self.assertIn("Files reviewed: `2`", rendered)
+
+    def test_render_comment_reports_context_presence_without_leaking_body(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {
+                "files": ["a.py"],
+                "pull_request_context": {
+                    "title": "Sensitive title",
+                    "body": "Sensitive body",
+                    "commit_messages": ["Add parser"],
+                },
+            },
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("PR title provided: `true`", rendered)
+        self.assertIn("PR body provided: `true`", rendered)
+        self.assertIn("Commit messages provided: `1`", rendered)
+        self.assertNotIn("Sensitive body", rendered)
 
 
 class RunnerContractTests(unittest.TestCase):
