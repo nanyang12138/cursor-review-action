@@ -248,6 +248,8 @@ review_focus:
 max_findings: 5
 max_diff_bytes: 120000
 filter_mode: added
+scope_mode: full
+scope_files: ""
 persistent_comment: true
 enabled_commands:
   - review
@@ -291,6 +293,16 @@ with:
   exclude-patterns: "*.lock,dist/**,build/**"
 ```
 
+Opt into a file-scoped review for a single workflow call:
+
+```yaml
+with:
+  scope-mode: files
+  scope-files: "src/**,tests/**"
+```
+
+The default `scope-mode: full` reviews the full selected PR diff before include/exclude filters and budget limits are applied.
+
 Disable PR comments and only print the result in the Actions summary:
 
 ```yaml
@@ -331,6 +343,8 @@ Important inputs:
 - `max-diff-bytes`: Maximum diff size sent to Cursor. Default: `120000`.
 - `filter-mode`: `added`, `diff_context`, or `file`.
 - `include-patterns` / `exclude-patterns`: Comma-separated file globs.
+- `scope-mode`: `full` or `files`. Default: `full`.
+- `scope-files`: Comma-separated repository-relative paths or globs when `scope-mode` is `files`.
 - `persistent-comment`: Update the previous comment for the same command. Default: `true`.
 - `comment-mode`: `update`, `create`, or `off`.
 - `fail-on-error`: Fail the job when Cursor review fails. Default: `false`.
@@ -359,6 +373,8 @@ Supported arguments:
 
 - `--focus` or `--review-focus`: comma-separated review focus values.
 - `--max-findings`: integer from 1 to 50.
+- `--files`: comma-separated repository-relative paths or globs for an opt-in file-scoped review.
+- `--scope`: `full` or `files`; `full` forces the default full selected PR diff.
 
 Unknown arguments are not used as configuration overrides. They remain ordinary prompt text and are never passed to a shell.
 

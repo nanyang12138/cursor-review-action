@@ -92,6 +92,15 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Command args applied: `{', '.join(settings.get('command_arg_keys', []))}`")
     for warning in settings.get("command_arg_warnings", []):
         diagnostics.append(f"- Command args warning: `{warning}`")
+    scope = meta.get("scope") or {}
+    if scope:
+        diagnostics.append(f"- Review scope schema: `{scope.get('schema_version', 'unknown')}`")
+        diagnostics.append(f"- Review scope mode: `{scope.get('mode', 'full')}`")
+        diagnostics.append(f"- Review scope reason: `{scope.get('reason', 'unknown')}`")
+        diagnostics.append(f"- Review scope selected files: `{scope.get('selected_file_count', reviewed_count)}`")
+        diagnostics.append(f"- Review scope skipped files: `{scope.get('skipped_file_count', 0)}`")
+        for warning in scope.get("warnings") or []:
+            diagnostics.append(f"- Review scope warning: `{warning}`")
     trigger_trust = settings.get("trigger_trust") or {}
     if trigger_trust:
         diagnostics.append(f"- Trigger trust level: `{trigger_trust.get('trust_level', 'unknown')}`")
