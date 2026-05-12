@@ -67,7 +67,7 @@ todos:
     status: completed
   - id: parser-retry
     content: 实现结构化 JSON parser、一次 retry 和 markdown 降级路径
-    status: pending
+    status: completed
   - id: run-state
     content: 增加 command-specific markers、run metadata、stale-run diagnostics 和幂等更新策略
     status: pending

@@ -2,11 +2,12 @@
 import sys
 from pathlib import Path
 
+from engine.budget import normalized_budget_settings
 from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
-from engine.parser import parse_agent_output
+from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
@@ -74,9 +75,47 @@ def main() -> int:
     stdout = runner_result.raw_text
     stderr = runner_result.stderr
     raw_output = stdout + ("\n\nSTDERR:\n" + stderr if stderr else "")
-    Path("cursor_review_raw.txt").write_text(raw_output, encoding="utf-8")
 
-    markdown, findings_json, parsed_ok = parse_agent_output(stdout)
+    parse_result = parse_agent_output_result(stdout)
+    markdown = parse_result.markdown
+    findings_json = parse_result.findings_json
+    parsed_ok = parse_result.parsed_ok
+    parser_diagnostics = dict(parse_result.diagnostics)
+    parser_diagnostics["repair_retry_count"] = 0
+    runner_diagnostics = dict(runner_result.diagnostics)
+
+    max_cursor_calls = normalized_budget_settings(settings)["max_cursor_calls"]
+    cursor_calls_attempted = int(runner_diagnostics.get("cursor_calls_attempted", 1))
+    if exit_code == 0 and not parsed_ok:
+        if cursor_calls_attempted < max_cursor_calls:
+            repair_prompt = build_repair_prompt(command, stdout)
+            repair_result = run_cursor_result(repair_prompt, settings)
+            repair_parse_result = parse_agent_output_result(repair_result.raw_text)
+            cursor_calls_attempted += 1
+            raw_output = (
+                f"{raw_output}\n\nPARSER_REPAIR_STDOUT:\n{repair_result.raw_text}"
+                + ("\n\nPARSER_REPAIR_STDERR:\n" + repair_result.stderr if repair_result.stderr else "")
+            )
+            if repair_result.stderr:
+                stderr = (stderr + "\n\n" if stderr else "") + "Parser repair retry stderr:\n" + repair_result.stderr
+            if repair_result.exit_code == 0 and repair_parse_result.parsed_ok:
+                markdown = repair_parse_result.markdown
+                findings_json = repair_parse_result.findings_json
+                parsed_ok = True
+                parser_diagnostics = dict(repair_parse_result.diagnostics)
+                parser_diagnostics["repair_succeeded"] = True
+            else:
+                parser_diagnostics["repair_succeeded"] = False
+                parser_diagnostics["repair_failure_kind"] = repair_result.failure_kind
+                parser_diagnostics["repair_exit_code"] = repair_result.exit_code
+            parser_diagnostics["repair_retry_count"] = 1
+        else:
+            parser_diagnostics["repair_skipped_reason"] = "max_cursor_calls_exhausted"
+
+    runner_diagnostics["cursor_calls_attempted"] = cursor_calls_attempted
+    runner_diagnostics["retry_count"] = parser_diagnostics.get("repair_retry_count", 0)
+    runner_diagnostics["parser"] = parser_diagnostics
+    Path("cursor_review_raw.txt").write_text(raw_output, encoding="utf-8")
     rendered = render_comment(
         markdown,
         findings_json,
@@ -86,7 +125,7 @@ def main() -> int:
         parsed_ok,
         context.meta,
         settings,
-        runner_result.diagnostics,
+        runner_diagnostics,
     )
     Path("cursor_review.md").write_text(rendered, encoding="utf-8")
     Path("findings.json").write_text(findings_json, encoding="utf-8")
