@@ -125,10 +125,25 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            async function setPullRequestOutputs(pr) {
+              core.setOutput('number', pr.number);
+              core.setOutput('base_sha', pr.base.sha);
+              core.setOutput('head_sha', pr.head.sha);
+              core.setOutput('title', pr.title || '');
+              core.setOutput('body', pr.body || '');
+              core.setOutput('base_ref', pr.base.ref || '');
+              core.setOutput('head_ref', pr.head.ref || '');
+              const commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                per_page: 100
+              });
+              core.setOutput('commit_messages', commits.map((item) => item.commit.message.split('\n')[0]).join('\n'));
+            }
+
             if (context.eventName === 'pull_request') {
-              core.setOutput('number', context.payload.pull_request.number);
-              core.setOutput('base_sha', context.payload.pull_request.base.sha);
-              core.setOutput('head_sha', context.payload.pull_request.head.sha);
+              await setPullRequestOutputs(context.payload.pull_request);
               return;
             }
 
@@ -138,9 +153,7 @@ jobs:
               pull_number: context.issue.number
             });
 
-            core.setOutput('number', pr.data.number);
-            core.setOutput('base_sha', pr.data.base.sha);
-            core.setOutput('head_sha', pr.data.head.sha);
+            await setPullRequestOutputs(pr.data);
 
       - name: Checkout PR
         uses: actions/checkout@v4
@@ -156,6 +169,11 @@ jobs:
           base-sha: ${{ steps.pr.outputs.base_sha }}
           head-sha: ${{ steps.pr.outputs.head_sha }}
           pr-number: ${{ steps.pr.outputs.number }}
+          pr-title: ${{ steps.pr.outputs.title }}
+          pr-body: ${{ steps.pr.outputs.body }}
+          base-ref: ${{ steps.pr.outputs.base_ref }}
+          head-ref: ${{ steps.pr.outputs.head_ref }}
+          commit-messages: ${{ steps.pr.outputs.commit_messages }}
           event-name: ${{ github.event_name }}
           comment-body: ${{ github.event_name == 'issue_comment' && github.event.comment.body || '' }}
           enabled-commands: review,ask,improve,describe
@@ -293,6 +311,9 @@ Important inputs:
 - `github-token`: Token used to create or update PR comments, usually `${{ github.token }}`.
 - `base-sha` / `head-sha`: PR diff range.
 - `pr-number`: PR number for comment output.
+- `pr-title` / `pr-body`: PR title and description passed as review context.
+- `base-ref` / `head-ref`: Base and source branch names passed as review context.
+- `commit-messages`: Newline-separated commit messages passed as review context.
 - `event-name`: GitHub event name.
 - `comment-body`: PR comment body used to extract extra instructions.
 - `model`: Cursor model. Default: `auto`.

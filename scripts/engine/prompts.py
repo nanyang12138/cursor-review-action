@@ -43,6 +43,7 @@ Response contract:
 
 
 def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, truncated: bool, meta: Dict[str, Any], settings: Dict[str, Any]) -> str:
+    pull_request_context = meta.get("pull_request_context", {})
     diagnostics = {
         "command": command,
         "model": settings.get("model"),
@@ -55,6 +56,9 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
 
 Diagnostics:
 {json.dumps(diagnostics, ensure_ascii=False, indent=2)}
+
+Pull request context:
+{json.dumps(pull_request_context, ensure_ascii=False, indent=2)}
 
 Diff stat:
 {stat}

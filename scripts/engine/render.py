@@ -19,6 +19,12 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
     diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")
+    pull_request_context = meta.get("pull_request_context") or {}
+    if pull_request_context:
+        commit_count = len(pull_request_context.get("commit_messages") or [])
+        diagnostics.append(f"- PR title provided: `{str(bool(pull_request_context.get('title'))).lower()}`")
+        diagnostics.append(f"- PR body provided: `{str(bool(pull_request_context.get('body'))).lower()}`")
+        diagnostics.append(f"- Commit messages provided: `{commit_count}`")
 
     if exit_code != 0:
         markdown = f"""Cursor review failed before producing a reliable result.
