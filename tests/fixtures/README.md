@@ -14,6 +14,6 @@ review harness covers:
 - `ask_question`: command-specific ask schema and answer rendering.
 - `describe_summary`: command-specific describe schema and comment-only summary.
 
-The comparison protocol and larger release inventory remain separate follow-up
-work; these fixtures intentionally do not copy PR-Agent prompts, schemas, output,
-or golden text.
+The comparison protocol lives in `docs/parity-reports/` and uses these
+repository-owned fixtures as initial samples. The fixtures intentionally do not
+copy PR-Agent prompts, schemas, output, or golden text.

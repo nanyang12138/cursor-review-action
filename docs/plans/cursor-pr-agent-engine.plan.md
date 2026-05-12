@@ -76,7 +76,7 @@ todos:
     status: completed
   - id: comparison-protocol
     content: 建立 PR-Agent comparison protocol，把样例 PR 差距转成 backlog 或 explicit non-goal
-    status: pending
+    status: completed
   - id: traceability-scorecard
     content: 建立 capability ID、parity scorecard、release notes 追踪机制，确保 P0 能力可追溯
     status: completed

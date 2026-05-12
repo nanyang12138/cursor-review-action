@@ -25,6 +25,7 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 | RUN-STATE-P0 | P0 | Implemented in `scripts/engine/run_state.py` and entrypoint outputs | `tests/test_engine.py::RunStateTests` and entrypoint tests | Run id, command marker, lifecycle state, head SHA, event name, and stale diagnostics are output | No | P0 stale-run support is diagnostic-only. |
 | SEC-TRIGGER-P0 | P0 | Implemented in `scripts/engine/trust_policy.py` before context construction or Cursor calls | `tests/fixtures/triggers/*.json`; trigger policy unit tests | Skip reason, trust level, event, fork state, and secret availability are reported | No | Untrusted issue comments and fork PRs without secrets do not call Cursor. |
 | FIXTURE-HARNESS-P0 | P0 | Implemented in `scripts/engine/fixtures.py` | `tests/test_engine.py::FixtureRegressionTests` | Fixture diagnostics record fixture name, parser status, and capability IDs | Partial | Current harness has 5 concrete PR fixtures; v0.5 requires 10. |
+| COMPARISON-PROTOCOL-P1 | P1 | Implemented in `docs/parity-reports/README.md`, `template.md`, and initial gap log | `tests/test_engine.py::ComparisonProtocolTests` | Gap log requires release impact and backlog/deferred/non-goal decisions | No for protocol; sample volume remains a release gate | Initial suite maps 5 repository-owned samples and 6 gaps without copying PR-Agent output. |
 | TRACEABILITY-SCORECARD-P0 | P0 | Implemented in this scorecard and validated by unit tests | `tests/test_engine.py::FixtureRegressionTests` scorecard coverage test | Capability IDs now connect fixture evidence to release blockers | No | Keep this file updated with each capability PR. |
 
 ## Current release blockers
@@ -32,7 +33,6 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 These blockers are not failures of the scorecard itself; they are remaining final
 product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
-- `comparison-protocol`: no PR-Agent comparison report template or sample gap log yet.
 - `prompt-governance`: prompt change checklist and quality metrics are not documented.
 - `finding-taxonomy`: stable taxonomy and noise-control rules are not implemented.
 - `repo-guidance`: `.cursor-review-instructions.md` / `best_practices.md` injection is not implemented.
