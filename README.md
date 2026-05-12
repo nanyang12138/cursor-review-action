@@ -26,6 +26,7 @@ This action is intentionally smaller:
 - Automatically review PRs when they are opened, updated, or reopened.
 - Manually review, ask about, improve, or describe a PR with slash commands.
 - Accept extra instructions after a supported slash command.
+- Accept allowlisted slash command arguments such as `--focus` and `--max-findings`.
 - Use a repo-local `.cursor-review.yml` configuration file.
 - Select a Cursor model with the `model` input.
 - Filter files with include/exclude patterns.
@@ -241,7 +242,7 @@ exclude_patterns:
 Configuration precedence:
 
 ```text
-PR comment prompt > .cursor-review.yml > workflow inputs > action defaults
+slash command arguments > PR comment prompt > .cursor-review.yml > workflow inputs > action defaults
 ```
 
 ## Common Customizations
@@ -319,13 +320,27 @@ Supported slash commands:
 
 The recommended workflow and `.cursor-review.yml` enable all four commands. If you pass `enabled-commands` manually, include every command you want to allow.
 
+`/cursor-review` supports a small allowlist of per-run arguments:
+
+```text
+/cursor-review --focus=security,tests --max-findings=3
+Check authentication edge cases first.
+```
+
+Supported arguments:
+
+- `--focus` or `--review-focus`: comma-separated review focus values.
+- `--max-findings`: integer from 1 to 50.
+
+Unknown arguments are not used as configuration overrides. They remain ordinary prompt text and are never passed to a shell.
+
 ## Security Model
 
 - Never hardcode `CURSOR_API_KEY` in workflow files.
 - Keep GitHub token permissions minimal.
 - Restrict comment-triggered runs to trusted users.
 - Treat PR comments and diff content as untrusted prompt input.
-- The action passes comment text to Cursor as prompt text only; it does not execute comment text as shell.
+- The action parses only allowlisted slash command arguments and passes remaining comment text to Cursor as prompt text only; it does not execute comment text as shell.
 
 The example workflow restricts manual triggers to:
 

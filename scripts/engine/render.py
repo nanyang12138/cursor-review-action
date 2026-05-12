@@ -16,6 +16,10 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Findings JSON parsed: `{str(parsed_ok).lower()}`",
         f"- Cursor exit code: `{exit_code}`",
     ]
+    if settings.get("command_arg_keys"):
+        diagnostics.append(f"- Command args applied: `{', '.join(settings.get('command_arg_keys', []))}`")
+    for warning in settings.get("command_arg_warnings", []):
+        diagnostics.append(f"- Command args warning: `{warning}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
     diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")

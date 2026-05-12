@@ -48,6 +48,8 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
         "model": settings.get("model"),
         "language": settings.get("language"),
         "config_loaded": settings.get("config_loaded"),
+        "command_arg_overrides": settings.get("command_arg_overrides", {}),
+        "command_arg_warnings": settings.get("command_arg_warnings", []),
         "diff_truncated": truncated,
         "diff_meta": meta,
     }

@@ -17,20 +17,25 @@ def derive_command_and_prompt(settings: Dict[str, Any]) -> Tuple[str, str]:
     command = str(settings.get("command", "review") or "review").strip().lower()
 
     if explicit_prompt:
+        settings["command_prompt_source"] = "user_prompt"
         return command, explicit_prompt
 
     stripped = comment_body.strip()
     if not stripped:
+        settings["command_prompt_source"] = "none"
         return command, ""
 
     for trigger, mapped_command in COMMAND_ALIASES.items():
         if stripped.startswith(trigger):
+            settings["command_prompt_source"] = "slash_command"
             return mapped_command, stripped[len(trigger):].strip()
 
     trigger_phrase = str(settings.get("trigger_phrase", "/cursor-review"))
     if trigger_phrase in stripped:
+        settings["command_prompt_source"] = "trigger_phrase"
         return command, stripped.replace(trigger_phrase, "", 1).strip()
 
+    settings["command_prompt_source"] = "comment_body"
     return command, stripped
 
 
