@@ -29,6 +29,10 @@ not authorize automation to merge, tag, publish, or release.
 | Documentation | README, troubleshooting, local dry-run, privacy/logging, CI policy, and non-goals are current. |
 | Release notes | `docs/release-notes.md` lists capability IDs, known limitations, dependency risks, and deferred non-goals. |
 
+Use `docs/final-readiness-audit.md` as the automation-produced evidence index
+when reviewing these gates for the first stable release. It does not replace
+maintainer review and does not authorize automation to create tags or releases.
+
 ## Pre-stable references
 
 Before the first stable release, README examples may use:

@@ -58,7 +58,8 @@ product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
 - None at this scorecard layer. Stable release still requires human review of
   the release checklist, pre-stable release notes, dogfooding evidence, and
-  no-auto-release policy.
+  no-auto-release policy. `docs/final-readiness-audit.md` is the
+  automation-produced evidence index for that final human review.
 
 ## Maintenance rules
 

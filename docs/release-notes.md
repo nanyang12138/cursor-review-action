@@ -1,7 +1,8 @@
 # Pre-Stable Release Notes Draft
 
 Capability IDs: `SUPPLY-CHAIN-P0`, `TRACEABILITY-SCORECARD-P0`,
-`DOCS-POSITIONING-P1`, `NON-GOALS-P0`
+`DOCS-POSITIONING-P1`, `NON-GOALS-P0`, `FIXTURE-HARNESS-P0`,
+`ACCEPTANCE-RUBRIC-P1`, `COMPARISON-PROTOCOL-P1`
 
 These release notes are maintainer-facing draft evidence for the first stable
 Cursor Review Action release. They do not authorize automation to merge, tag,
@@ -53,6 +54,9 @@ diagnostics, and release-blocker status for these stable-release surfaces:
   status. It intentionally avoids public full PR-Agent parity claims.
 - `docs/parity-reports/2026-05-12-initial-gap-log.md` records clean-room
   behavior-level comparison evidence and gap dispositions.
+- `docs/final-readiness-audit.md` ties the release checklist, scorecard,
+  fixture inventory, comparison/dogfooding evidence, release notes, and
+  no-auto-release policy into one final human-review evidence index.
 
 ## Known limitations and deferred non-goals
 
@@ -120,6 +124,8 @@ deferred feature.
 ## Remaining human release gates
 
 - Review `docs/release-checklist.md` against the exact target commit.
+- Review `docs/final-readiness-audit.md` as the automation-produced evidence
+  index for final product readiness.
 - Review dogfooding and human acceptance rubric records for false positives,
   missed issues, evidence quality, and diagnostics usefulness.
 - Confirm no unresolved P0 blocker remains in `docs/parity-scorecard.md`.

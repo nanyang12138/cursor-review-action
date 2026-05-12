@@ -146,6 +146,9 @@ todos:
   - id: docs-positioning
     content: 更新 README，说明 clean-room PR-Agent-inspired architecture 与 Cursor-native 优势
     status: completed
+  - id: final-readiness-audit
+    content: 补齐最终产品硬化审计，串联 release checklist、release notes、scorecard、fixture/dogfooding evidence 和人工发布边界
+    status: completed
 isProject: false
 ---
 
@@ -485,6 +488,11 @@ flowchart TD
 - README 已记录 `DOCS-POSITIONING-P1`，说明 clean-room PR-Agent-inspired
   边界、Cursor-native 架构优势、稳定兼容契约、实验命令边界与 release
   gate 链接，并由 `ReadmePositioningTests` 约束。
+- `docs/final-readiness-audit.md` 已记录最终产品硬化审计，把
+  `SUPPLY-CHAIN-P0`、`TRACEABILITY-SCORECARD-P0`、`FIXTURE-HARNESS-P0`、
+  `ACCEPTANCE-RUBRIC-P1`、`COMPARISON-PROTOCOL-P1` 和
+  `DOCS-POSITIONING-P1` 的 release readiness 证据连接到 checklist、
+  release notes、scorecard、fixture/dogfooding 记录和人工发布边界。
 - Release checklist 通过后才能打稳定 tag。
 - README 明确说明这是 clean-room Cursor-native PR Agent，不复制 PR-Agent 代码。
 
@@ -509,6 +517,15 @@ flowchart TD
 - Partial review：使用醒目 degraded heading 和 coverage warning。
 - Unsupported claims：P0 覆盖测试、安全、性能、部署/运行时、外部 issue/ticket/customer 状态。
 - Quality gate output：进入 `findings-json` 和 Actions summary，PR comment 放 compact diagnostics。
+
+## 当前自动化实现状态
+
+- No remaining allowed implementation work is identified at the current plan
+  layer.
+- 剩余动作是人工发布 review：维护者复核 final readiness audit、release
+  checklist、release notes、scorecard 和 dogfooding evidence，然后才可手动
+  选择 tag/release。
+- Automation 仍不得 auto-merge、auto-release、创建 release 或创建 tag。
 
 ## 当前重新打开条件
 

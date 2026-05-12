@@ -2101,6 +2101,14 @@ Implementation evidence:
 - `docs/parity-scorecard.md` records `DOCS-POSITIONING-P1` as a non-blocking
   documentation capability while keeping stable release authority with human
   review of release and dogfooding evidence.
+- `docs/final-readiness-audit.md` records the Final Product Hardening
+  release-readiness audit for `SUPPLY-CHAIN-P0`, `TRACEABILITY-SCORECARD-P0`,
+  `FIXTURE-HARNESS-P0`, `ACCEPTANCE-RUBRIC-P1`, `COMPARISON-PROTOCOL-P1`, and
+  `DOCS-POSITIONING-P1`, linking release checklist gates, release notes,
+  scorecard state, fixture/dogfooding evidence, and the no-auto-release policy.
+  It identifies no remaining allowed implementation work at the current mapping
+  layer; remaining stable-release actions are human review, optional live
+  dogfooding rerun, manual tag selection, and manual release publication.
 
 ## Compatibility Contract
 
@@ -2359,6 +2367,18 @@ Dogfooding gates:
 - No release tag without at least one self-review run.
 - No stable `v1` without fixtures derived from real self-review issues.
 - Every significant prompt change must add or update a fixture.
+
+Implementation evidence:
+
+- `docs/final-readiness-audit.md` identifies the long-lived goal PR `#29` /
+  `cursor/cursor-pr-agent-engine-goal-5865` as the self-review integration
+  surface for final hardening and records the local no-Cursor dogfooding dry-run
+  command that validates config, context, diff selection, parser, renderer,
+  lifecycle diagnostics, quality-gate diagnostics, and `Cursor contacted: false`
+  behavior before human release review.
+- `tests/fixtures/pr_regression/*/human_eval.md` and
+  `docs/parity-reports/2026-05-12-initial-gap-log.md` provide acceptance-rubric
+  records for fixture and comparison scenarios without copying PR-Agent output.
 
 ## Resolved Open Questions
 

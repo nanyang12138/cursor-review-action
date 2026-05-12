@@ -1958,6 +1958,50 @@ class SupplyChainTests(unittest.TestCase):
         self.assertNotIn("auto-create release tags", release_notes.lower())
 
 
+class FinalReadinessAuditTests(unittest.TestCase):
+    def test_final_readiness_audit_links_release_gates_and_human_boundaries(self) -> None:
+        audit = (ROOT / "docs" / "final-readiness-audit.md").read_text(encoding="utf-8")
+        release_checklist = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
+        release_notes = (ROOT / "docs" / "release-notes.md").read_text(encoding="utf-8")
+        mapping = (ROOT / "PR_AGENT_ENGINE_MAPPING.md").read_text(encoding="utf-8")
+        plan = (ROOT / "docs" / "plans" / "cursor-pr-agent-engine.plan.md").read_text(encoding="utf-8")
+
+        for capability_id in [
+            "SUPPLY-CHAIN-P0",
+            "TRACEABILITY-SCORECARD-P0",
+            "FIXTURE-HARNESS-P0",
+            "ACCEPTANCE-RUBRIC-P1",
+            "COMPARISON-PROTOCOL-P1",
+            "DOCS-POSITIONING-P1",
+        ]:
+            with self.subTest(capability_id=capability_id):
+                self.assertIn(capability_id, audit)
+
+        for gate in [
+            "Fixture regression",
+            "Release blockers",
+            "Compatibility",
+            "Security model",
+            "Supply chain",
+            "Cursor CLI diagnostics",
+            "Dogfooding and acceptance",
+            "Documentation",
+            "Release notes",
+        ]:
+            with self.subTest(gate=gate):
+                self.assertIn(f"| {gate} |", audit)
+
+        self.assertIn("no auto-merge, no auto-release, no tag creation", audit)
+        self.assertIn("python3 scripts/cursor_review.py --dry-run", audit)
+        self.assertIn("Cursor contacted: false", audit)
+        self.assertIn("No remaining allowed implementation work", audit)
+        self.assertIn("docs/final-readiness-audit.md", release_checklist)
+        self.assertIn("docs/final-readiness-audit.md", release_notes)
+        self.assertIn("docs/final-readiness-audit.md", mapping)
+        self.assertIn("final-readiness-audit", plan)
+        self.assertNotIn("status: pending", plan)
+
+
 class TriggerTrustPolicyTests(unittest.TestCase):
     def test_trigger_fixture_decisions_match_expected_policy(self) -> None:
         fixture_dir = ROOT / "tests" / "fixtures" / "triggers"
