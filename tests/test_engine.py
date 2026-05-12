@@ -158,6 +158,40 @@ class ContextBuilderTests(unittest.TestCase):
         self.assertEqual(pr_context["comment_prompt"], "Focus on tests.")
 
 
+class DiffSelectorTests(unittest.TestCase):
+    def test_build_diff_records_reviewed_and_budget_skipped_files(self) -> None:
+        def fake_file_diff(file_name: str, *_args: object) -> str:
+            if file_name == "a.py":
+                return "diff --git a/a.py b/a.py\n+small\n"
+            return "diff --git a/b.py b/b.py\n+" + ("x" * 120) + "\n"
+
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(diff_selector, "changed_files", return_value=["a.py", "b.py"]):
+                with mock.patch.object(diff_selector, "_file_diff", side_effect=fake_file_diff):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        diff_text, stat, truncated, meta = diff_selector.build_diff({"max_diff_bytes": 80})
+
+        self.assertEqual(stat, "stat")
+        self.assertTrue(truncated)
+        self.assertIn("a.py", diff_text)
+        self.assertNotIn("b.py b/b.py", diff_text)
+        self.assertEqual(meta["reviewed_files"], [{"path": "a.py", "bytes": 32, "status": "included"}])
+        self.assertEqual(meta["skipped_files"], [{"path": "b.py", "reason": "max_diff_bytes"}])
+
+    def test_build_diff_records_filter_skipped_files_without_truncation(self) -> None:
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(diff_selector, "changed_files", return_value=["src/a.py", "dist/b.js"]):
+                with mock.patch.object(diff_selector, "_file_diff", return_value="diff --git a/src/a.py b/src/a.py\n+small\n"):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        _diff_text, _stat, truncated, meta = diff_selector.build_diff(
+                            {"max_diff_bytes": 120000, "exclude_patterns": "dist/**"}
+                        )
+
+        self.assertFalse(truncated)
+        self.assertEqual([item["path"] for item in meta["reviewed_files"]], ["src/a.py"])
+        self.assertEqual(meta["skipped_files"], [{"path": "dist/b.js", "reason": "excluded"}])
+
+
 class PromptParserRenderTests(unittest.TestCase):
     def test_build_prompt_preserves_response_contract_and_diagnostics(self) -> None:
         settings = {
@@ -257,6 +291,7 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("No issues.", rendered)
         self.assertIn("Diff truncated: `true`", rendered)
         self.assertIn("Files reviewed: `2`", rendered)
+        self.assertIn("Files skipped: `0`", rendered)
 
     def test_render_comment_reports_context_presence_without_leaking_body(self) -> None:
         rendered = render.render_comment(
