@@ -1653,7 +1653,10 @@ PR-Agent behavior to learn from:
 
 Current action:
 
-- Mentions 10-20 fixtures but does not define the minimum set.
+- Defines the minimum fixture inventory and tracks concrete no-Cursor fixtures
+  in `tests/fixtures/README.md` and `docs/parity-scorecard.md`.
+- As of the invalid model output fixture, the suite has 10 concrete no-Cursor
+  fixtures: 9 PR regression fixtures plus 1 output quality gate fixture.
 
 Cursor-native implementation:
 
@@ -1698,6 +1701,16 @@ Validation checklist:
 - Every P0 capability has at least one fixture.
 - Every fixture has capability IDs.
 - Fixtures cover both positive and negative cases.
+
+Implementation evidence:
+
+- `tests/fixtures/pr_regression/invalid_model_output` covers malformed model
+  `<findings_json>` and verifies parser fallback plus `publish_with_diagnostics`
+  output quality gate behavior without contacting Cursor.
+- `tests/fixtures/README.md` records the 10 concrete no-Cursor fixtures and the
+  remaining `v1` target of 20 fixtures.
+- `docs/parity-scorecard.md` tracks `FIXTURE-HARNESS-P0` evidence and keeps the
+  remaining final-product fixture blockers visible.
 
 ### Quality and Regression
 
@@ -1960,7 +1973,8 @@ Purpose:
 
 Required:
 
-- 10-20 fixture PR cases.
+- 10-20 fixture PR cases. The `v0.5` volume floor is satisfied by 10 concrete
+  no-Cursor fixtures; `v1` still targets 20.
 - no-Cursor regression tests for config/context/diff/prompt/parser/render.
 - grounding fixtures cover valid, file-only, invalid, deleted-only, and skipped-file anchors.
 - deduplication fixtures cover duplicate and similar-but-distinct findings.
