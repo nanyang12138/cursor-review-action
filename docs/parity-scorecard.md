@@ -48,14 +48,13 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 | PROMPT-GOVERNANCE-P1 | P1 | Implemented in `docs/prompt-governance.md`, `scripts/engine/prompt_templates/VERSION`, and prompt diagnostics | `tests/test_engine.py::PromptParserRenderTests` prompt version and template contract tests | Prompt template version is included in prompt and PR comment diagnostics | No for governance; dogfooding metrics still feed later release gates | Prompt changes now have a checklist, metrics, fixture update rules, and clean-room guardrails. |
 | REPO-GUIDANCE-P1 | P1 | Implemented in `scripts/engine/guidance.py`, `scripts/engine/context.py`, and `scripts/engine/prompts.py` | `tests/test_engine.py::RepoGuidanceTests`; `tests/fixtures/pr_regression/improve_suggestions`; `docs/repo-guidance.md` | Prompt diagnostics include loaded/skipped guidance metadata; rendered comments show file names and budget usage without guidance body | No for concrete fixture coverage; dogfooding evidence still needed before stable release | Loads `.cursor-review-instructions.md` for all commands and `best_practices.md` for `/cursor-improve` within repo-relative byte/line budgets. |
 | HELP-DISCOVERABILITY-P1 | P1 | Implemented in `scripts/engine/help.py`, command routing, and the entrypoint static help fast path | `tests/test_engine.py::CommandTests`, `tests/test_engine.py::PromptParserRenderTests`, and entrypoint help coverage | Help diagnostics show enabled commands and `Cursor contacted: false` | No | `/cursor-help` and `/cursor-review help` publish safe static help and list only enabled Cursor-backed commands. |
+| NON-GOALS-P0 | P0 | Implemented in `docs/non-goals.md` with v1 non-goal and deferred-feature classification | `tests/test_engine.py::NonGoalsDocumentationTests` | Release documentation now names unsupported surfaces and revisit evidence before implementation | No | GitHub App, multi-platform providers, auto-fix, inline comments, labels, ticket integrations, PR body mutation by default, and full PR-Agent parity claims are explicitly out of v1 scope or deferred. |
 
 ## Current release blockers
 
 These blockers are not failures of the scorecard itself; they are remaining final
 product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
-- `non-goals`: `docs/non-goals.md` still needs the v1 deferred-feature and
-  out-of-scope classification record.
 - `docs-positioning`: README positioning for clean-room Cursor-native behavior is
   not updated.
 

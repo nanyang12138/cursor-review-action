@@ -1678,6 +1678,19 @@ Validation checklist:
 - README does not imply unsupported behavior.
 - New feature requests are classified as P0/P1/P2/out-of-scope before implementation.
 
+Implementation evidence:
+
+- `docs/non-goals.md` records `NON-GOALS-P0` and `DEFERRED-FEATURES-P1` with
+  v1 non-goal, deferred, and out-of-scope classifications for GitHub App,
+  multi-platform providers, auto-fix, inline comments, labels, PR body mutation
+  by default, ticket integrations, multi-call chunking, second critique,
+  `pull_request_target`, and public full-parity claims.
+- `README.md` now points unsupported surfaces to `docs/non-goals.md` and keeps
+  the public positioning limited to implemented clean-room behavioral parity.
+- `tests/test_engine.py::NonGoalsDocumentationTests` verifies required deferred
+  features, clean-room boundaries, evidence requirements, and README limitation
+  language remain documented.
+
 ### Fixture Inventory Requirements
 
 PR-Agent behavior to learn from:

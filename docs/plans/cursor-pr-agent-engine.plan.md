@@ -127,7 +127,7 @@ todos:
     status: completed
   - id: non-goals
     content: 文档化 v1 前不做的 PR-Agent 周边能力，避免 GitHub App、多平台、auto-fix、inline suggestion 等范围膨胀
-    status: pending
+    status: completed
   - id: fixture-inventory
     content: 建立最低 fixture inventory，覆盖 docs-only、安全、大 PR、invalid config、fork PR、invalid model output 等正反案例
     status: completed
@@ -469,6 +469,10 @@ flowchart TD
 - Metadata cache P1 已实现为 describe comment hidden marker：review/improve 仅在
   schema、source command、output schema、head SHA、启用状态和大小预算全部通过时复用，
   缺失、过期、禁用或无效缓存都会安全回退到当前 PR context。
+- `docs/non-goals.md` 已记录 `NON-GOALS-P0` 与 `DEFERRED-FEATURES-P1`，
+  明确 GitHub App、多平台、auto-fix、inline comments、labels、ticket
+  integration、默认 PR body mutation、multi-call chunking、second critique、
+  full PR-Agent parity claims 等 v1 非目标或延后能力，并由文档测试约束。
 - Release checklist 通过后才能打稳定 tag。
 - README 明确说明这是 clean-room Cursor-native PR Agent，不复制 PR-Agent 代码。
 

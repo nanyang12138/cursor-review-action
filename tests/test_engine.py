@@ -2015,6 +2015,45 @@ class ComparisonProtocolTests(unittest.TestCase):
                 self.assertIn("Release impact:", section)
 
 
+class NonGoalsDocumentationTests(unittest.TestCase):
+    def test_non_goals_document_classifies_deferred_features(self) -> None:
+        doc = (ROOT / "docs" / "non-goals.md").read_text(encoding="utf-8")
+        normalized = " ".join(doc.split())
+
+        self.assertIn("NON-GOALS-P0", doc)
+        self.assertIn("DEFERRED-FEATURES-P1", doc)
+        for feature in [
+            "GitHub App server",
+            "Multi-platform providers",
+            "Auto-fix",
+            "Full inline comments",
+            "Labels derived from findings",
+            "Blocking merge policies",
+            "/cursor-describe` PR body mutation",
+            "Multi-call chunking",
+            "Second Cursor critique call",
+            "Ticket system",
+            "Ask on images",
+            "pull_request_target",
+        ]:
+            with self.subTest(feature=feature):
+                self.assertIn(feature, normalized)
+
+        self.assertIn("Do not copy PR-Agent source code", normalized)
+        self.assertIn("Require at least one no-Cursor test", normalized)
+        self.assertIn("The current README describes", normalized)
+
+    def test_readme_points_unsupported_behavior_to_non_goals(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+
+        self.assertIn("docs/non-goals.md", normalized)
+        self.assertIn("does not implement auto-fix", normalized)
+        self.assertIn("does not implement labels", normalized)
+        self.assertIn("does not implement multi-platform provider support", normalized)
+        self.assertIn("does not claim full PR-Agent product parity", normalized)
+
+
 class AcceptanceRubricTests(unittest.TestCase):
     REQUIRED_FIELDS = [
         "real_issue_found",
