@@ -60,6 +60,31 @@ The dry-run must report `Cursor contacted: false`, parse deterministic stored or
 synthetic output, render lifecycle and quality-gate diagnostics, and avoid
 publishing a PR comment.
 
+## Automation verification snapshots
+
+### 2026-05-12 22:22 UTC
+
+- Goal PR: `#29` / `cursor/cursor-pr-agent-engine-goal-5865`
+- Active phase: Final Product Hardening / release-readiness verification
+- Selected milestone: final readiness verification for the completed current
+  plan layer
+- Capability IDs verified: `SUPPLY-CHAIN-P0`,
+  `TRACEABILITY-SCORECARD-P0`, `FIXTURE-HARNESS-P0`,
+  `ACCEPTANCE-RUBRIC-P1`, `COMPARISON-PROTOCOL-P1`,
+  `DOCS-POSITIONING-P1`
+- Verification:
+  - `python3 -m unittest tests/test_engine.py` passed with 121 tests.
+  - `python3 -m compileall scripts tests` passed.
+  - `python3 scripts/cursor_review.py --dry-run` passed with
+    `Cursor contacted: false`, lifecycle state `published`, quality gate
+    decision `publish`, and exit code `0`.
+- PR update note: the automation attempted to update the existing long-lived PR
+  body, but the PR update tool was bound to the initial per-run branch rather
+  than this long-lived goal branch. The branch update was pushed instead, and no
+  replacement PR was created.
+- Release policy: no auto-merge, no tag creation, and no release publication
+  were performed.
+
 ## Human release review checklist
 
 Human maintainers still own the final stable release decision:
