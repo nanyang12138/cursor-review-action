@@ -21,9 +21,12 @@ def load_command_template(command: str) -> Template:
 
 
 def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any]) -> str:
+    template = COMMAND_TEMPLATES.get(command, COMMAND_TEMPLATES["review"])
     language = settings.get("language", "zh-CN")
     max_findings = settings.get("max_findings", 5)
     focus = ", ".join(split_csv(settings.get("review_focus")))
+    output_schema = output_schema_for_command(command)
+    output_schema_text = json.dumps(output_schema, ensure_ascii=False, indent=2)
 
     extra = ""
     if user_prompt:
