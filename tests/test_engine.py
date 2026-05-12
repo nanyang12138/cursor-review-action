@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import commands, config, context, parser, prompts, render, runner  # noqa: E402
+from engine import command_args, commands, config, context, parser, prompts, render, runner  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -27,6 +27,7 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(command, "ask")
         self.assertEqual(user_prompt, "Why did this change?")
+        self.assertEqual(settings["command_prompt_source"], "slash_command")
 
     def test_explicit_user_prompt_keeps_configured_command(self) -> None:
         settings = {
@@ -45,6 +46,31 @@ class CommandTests(unittest.TestCase):
 
         self.assertFalse(enabled)
         self.assertEqual(message, "Command `ask` is not enabled. Enabled commands: review.")
+
+    def test_command_args_override_known_settings_and_preserve_prompt(self) -> None:
+        result = command_args.parse_command_args(
+            "review",
+            "--focus=security,tests --max-findings 3\nCheck auth boundaries.",
+        )
+
+        self.assertEqual(result.overrides, {"review_focus": "security,tests", "max_findings": 3})
+        self.assertEqual(result.parsed_args, ["--focus", "--max-findings"])
+        self.assertEqual(result.user_prompt, "Check auth boundaries.")
+        self.assertEqual(result.warnings, [])
+
+    def test_unknown_command_arg_remains_prompt_text(self) -> None:
+        result = command_args.parse_command_args("review", "--shell='rm -rf /' Check this.")
+
+        self.assertEqual(result.overrides, {})
+        self.assertEqual(result.user_prompt, "--shell='rm -rf /' Check this.")
+        self.assertEqual(len(result.warnings), 1)
+
+    def test_invalid_command_arg_value_is_consumed_with_warning(self) -> None:
+        result = command_args.parse_command_args("review", "--max-findings=not-a-number Check this.")
+
+        self.assertEqual(result.overrides, {})
+        self.assertEqual(result.user_prompt, "Check this.")
+        self.assertEqual(result.warnings, ["--max-findings must be an integer and was ignored."])
 
 
 class ConfigTests(unittest.TestCase):
@@ -226,13 +252,14 @@ class EntrypointTests(unittest.TestCase):
             env = {
                 "INPUT_COMMAND": "review",
                 "INPUT_ENABLED_COMMANDS": "review",
+                "INPUT_COMMENT_BODY": "/cursor-review --focus=security,tests --max-findings=2\nCheck auth.",
                 "INPUT_CONFIG_PATH": str(Path(tmp) / "missing.yml"),
                 "GITHUB_OUTPUT": str(Path(tmp) / "outputs.txt"),
                 "GITHUB_STEP_SUMMARY": str(Path(tmp) / "summary.md"),
             }
             with mock.patch.dict(os.environ, env, clear=True):
                 with mock.patch.object(cursor_review, "build_review_context", return_value=fake_context):
-                    with mock.patch.object(cursor_review, "run_cursor_result", return_value=fake_runner_result):
+                    with mock.patch.object(cursor_review, "run_cursor_result", return_value=fake_runner_result) as run_cursor:
                         cwd = os.getcwd()
                         os.chdir(tmp)
                         try:
@@ -244,6 +271,10 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("No issues found.", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
+            prompt = run_cursor.call_args.args[0]
+            self.assertIn("Maximum findings: 2.", prompt)
+            self.assertIn("Review focus: security, tests.", prompt)
+            self.assertIn("Check auth.", prompt)
 
 
 if __name__ == "__main__":

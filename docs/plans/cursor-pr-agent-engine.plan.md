@@ -52,7 +52,7 @@ todos:
     status: completed
   - id: command-args
     content: 实现安全的 slash command 参数解析，例如 --focus、--max-findings，并禁止任意参数进入 shell
-    status: pending
+    status: completed
   - id: command-templates
     content: 为 review/ask/improve/describe 建立独立 prompt template 和 output schema
     status: pending
