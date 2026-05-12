@@ -27,6 +27,12 @@ COMMANDS = [
 ]
 
 HELP_ALIASES = ["/cursor-help", "/cursor-review help"]
+EXAMPLES = {
+    "review": "/cursor-review --focus=security,tests --max-findings=3",
+    "ask": "/cursor-ask Why did the auth flow change?",
+    "improve": "/cursor-improve --files src/auth.py,tests/test_auth.py",
+    "describe": "/cursor-describe",
+}
 
 
 def enabled_command_names(settings: Dict[str, Any]) -> List[str]:
@@ -42,8 +48,11 @@ def render_help(settings: Dict[str, Any]) -> str:
         for name, slash, description in COMMANDS
         if name in enabled_set
     ]
+    example_lines = [EXAMPLES[name] for name in enabled if name in EXAMPLES]
     if not command_lines:
         command_lines = ["- No review commands are enabled for this run."]
+    if not example_lines:
+        example_lines = ["/cursor-help"]
 
     aliases = ", ".join(f"`{alias}`" for alias in HELP_ALIASES)
     config_path = str(settings.get("config_path") or ".cursor-review.yml")
@@ -62,10 +71,7 @@ Help is always available through {aliases}.
 ## Examples
 
 ```text
-/cursor-review --focus=security,tests --max-findings=3
-/cursor-ask Why did the auth flow change?
-/cursor-improve --files src/auth.py,tests/test_auth.py
-/cursor-describe
+{chr(10).join(example_lines)}
 ```
 
 ## Allowlisted per-run arguments
