@@ -657,7 +657,7 @@ class PromptParserRenderTests(unittest.TestCase):
 <findings_json>[{"severity":"low","file":"a.py"}]</findings_json>
 """
 
-        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw, "describe")
+        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw)
 
         self.assertEqual(markdown, "No issues.")
         self.assertTrue(parsed_ok)
@@ -708,7 +708,7 @@ class PromptParserRenderTests(unittest.TestCase):
 <findings_json>{"schema_version":"cursor-review-action/v1","command":"describe","summary":"Parser update"}</findings_json>
 """
 
-        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw)
+        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw, "describe")
 
         self.assertEqual(markdown, "It updates parser behavior.")
         self.assertTrue(parsed_ok)
