@@ -1,45 +1,45 @@
 import json
 from pathlib import Path
+from string import Template
 from typing import Any, Dict
 
 from .config import split_csv
-from .guidance import format_guidance_for_prompt
-from .schemas import schema_text
+from .schemas import schema_contract_for_prompt, schema_for_command
 
 
 TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
-VERSION_FILE = TEMPLATE_DIR / "VERSION"
+SUPPORTED_TEMPLATE_COMMANDS = {"review", "ask", "improve", "describe"}
 
 
-def prompt_template_version() -> str:
-    if not VERSION_FILE.exists():
-        return "unversioned"
-    return VERSION_FILE.read_text(encoding="utf-8").strip() or "unversioned"
+def template_path_for_command(command: str) -> Path:
+    normalized = command if command in SUPPORTED_TEMPLATE_COMMANDS else "review"
+    return TEMPLATE_DIR / f"{normalized}.md"
+
+
+def load_command_template(command: str) -> Template:
+    return Template(template_path_for_command(command).read_text(encoding="utf-8"))
 
 
 def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any]) -> str:
+    template = COMMAND_TEMPLATES.get(command, COMMAND_TEMPLATES["review"])
     language = settings.get("language", "zh-CN")
     max_findings = settings.get("max_findings", 5)
     focus = ", ".join(split_csv(settings.get("review_focus")))
-    template_path = TEMPLATE_DIR / f"{command}.md"
-    if not template_path.exists():
-        template_path = TEMPLATE_DIR / "review.md"
+    output_schema = output_schema_for_command(command)
+    output_schema_text = json.dumps(output_schema, ensure_ascii=False, indent=2)
 
     extra = ""
     if user_prompt:
         extra = f"\nAdditional user instructions from PR comment:\n{user_prompt}\n"
 
-    template = template_path.read_text(encoding="utf-8")
-    replacements = {
-        "{{language}}": str(language),
-        "{{max_findings}}": str(max_findings),
-        "{{focus}}": focus,
-        "{{user_prompt_section}}": extra.rstrip(),
-        "{{schema_json}}": schema_text(command),
-    }
-    for placeholder, value in replacements.items():
-        template = template.replace(placeholder, value)
-    return template.strip() + "\n"
+    template = load_command_template(command)
+    return template.safe_substitute(
+        language=language,
+        max_findings=max_findings,
+        focus=focus,
+        user_instructions=extra,
+        schema=schema_contract_for_prompt(command),
+    )
 
 
 def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, truncated: bool, meta: Dict[str, Any], settings: Dict[str, Any]) -> str:
@@ -48,8 +48,8 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
     guidance_prompt = format_guidance_for_prompt(repo_guidance)
     diagnostics = {
         "command": command,
-        "prompt_template_version": prompt_template_version(),
-        "prompt_template_name": command if (TEMPLATE_DIR / f"{command}.md").exists() else "review",
+        "prompt_template": template_path_for_command(command).name,
+        "output_schema": schema_for_command(command).get("schema_name"),
         "model": settings.get("model"),
         "language": settings.get("language"),
         "config_loaded": settings.get("config_loaded"),
