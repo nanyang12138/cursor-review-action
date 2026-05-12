@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, parser, prompts, render, runner, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, parser, prompts, render, runner, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -222,7 +222,57 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Review this pull request", prompt)
         self.assertIn("Additional user instructions from PR comment", prompt)
         self.assertIn("<review_markdown>", prompt)
+        self.assertIn('"command": "review"', prompt)
+        self.assertIn('"severity": "critical|high|medium|low"', prompt)
         self.assertIn('"diff_truncated": false', prompt)
+
+    def test_build_prompt_uses_command_specific_template_and_schema(self) -> None:
+        settings = {
+            "language": "en",
+            "max_findings": 3,
+            "review_focus": "tests",
+            "model": "auto",
+            "config_loaded": "",
+        }
+
+        ask_prompt = prompts.build_prompt(
+            "ask",
+            "What changed?",
+            "diff --git a/a.py b/a.py",
+            " a.py | 1 +",
+            False,
+            {"files": ["a.py"]},
+            settings,
+        )
+        improve_prompt = prompts.build_prompt(
+            "improve",
+            "",
+            "diff --git a/a.py b/a.py",
+            " a.py | 1 +",
+            False,
+            {"files": ["a.py"]},
+            settings,
+        )
+        describe_prompt = prompts.build_prompt(
+            "describe",
+            "",
+            "diff --git a/a.py b/a.py",
+            " a.py | 1 +",
+            False,
+            {"files": ["a.py"]},
+            settings,
+        )
+
+        self.assertIn("Answer the user's question", ask_prompt)
+        self.assertIn('"command": "ask"', ask_prompt)
+        self.assertIn('"answer"', ask_prompt)
+        self.assertNotIn("Review this pull request for correctness", ask_prompt)
+        self.assertIn("Suggest concrete improvements", improve_prompt)
+        self.assertIn('"command": "improve"', improve_prompt)
+        self.assertIn('"suggestions"', improve_prompt)
+        self.assertIn("comment-only summary", describe_prompt)
+        self.assertIn('"command": "describe"', describe_prompt)
+        self.assertIn('"walkthrough"', describe_prompt)
 
     def test_build_prompt_includes_pull_request_context(self) -> None:
         settings = {
@@ -271,6 +321,18 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertEqual(markdown, "No issues.")
         self.assertTrue(parsed_ok)
         self.assertEqual(json.loads(findings_json), [{"severity": "low", "file": "a.py"}])
+
+    def test_parse_agent_output_accepts_command_json_object(self) -> None:
+        raw = """
+<review_markdown>It updates parser behavior.</review_markdown>
+<findings_json>{"schema_version":"cursor-review-action/v1","command":"describe","summary":"Parser update"}</findings_json>
+"""
+
+        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw)
+
+        self.assertEqual(markdown, "It updates parser behavior.")
+        self.assertTrue(parsed_ok)
+        self.assertEqual(json.loads(findings_json)["command"], "describe")
 
     def test_parse_agent_output_falls_back_to_markdown_on_invalid_json(self) -> None:
         raw = """
