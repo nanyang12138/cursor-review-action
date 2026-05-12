@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Tuple
 
-from .schemas import schema_text
+from .schemas import output_schema_diagnostics, schema_text
 from .taxonomy import apply_finding_taxonomy
 
 
@@ -42,8 +42,19 @@ def parse_agent_output_result(raw: str, command: str = "review") -> ParseResult:
             parsed = json.loads(findings_raw)
             if isinstance(parsed, (dict, list)):
                 taxonomy_result = apply_finding_taxonomy(parsed, command)
+                schema_diagnostics = output_schema_diagnostics(taxonomy_result.payload, command)
+                if not schema_diagnostics.get("compatible", False):
+                    diagnostics = _diagnostics(
+                        False,
+                        str(schema_diagnostics.get("reason", "unsupported_schema_version")),
+                        str(schema_diagnostics.get("payload_schema_status", "unknown")),
+                    )
+                    diagnostics["schema"] = schema_diagnostics
+                    diagnostics["taxonomy"] = taxonomy_result.diagnostics
+                    return ParseResult(markdown, "[]", False, diagnostics)
                 findings_raw = json.dumps(taxonomy_result.payload, ensure_ascii=False, indent=2)
                 diagnostics = _diagnostics(True, "valid_json")
+                diagnostics["schema"] = schema_diagnostics
                 diagnostics["taxonomy"] = taxonomy_result.diagnostics
                 return ParseResult(markdown, findings_raw, True, diagnostics)
             return ParseResult(

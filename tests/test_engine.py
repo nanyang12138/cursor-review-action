@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, parser, prompts, render, runner, run_state, scope, taxonomy, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, parser, prompts, render, runner, run_state, schemas, scope, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -749,11 +749,71 @@ class PromptParserRenderTests(unittest.TestCase):
 <findings_json>{"schema_version":"cursor-review-action/v1","command":"describe","summary":"Parser update"}</findings_json>
 """
 
-        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw)
+        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw, "describe")
 
         self.assertEqual(markdown, "It updates parser behavior.")
         self.assertTrue(parsed_ok)
         self.assertEqual(json.loads(findings_json)["command"], "describe")
+
+    def test_schema_contract_lists_supported_versions_and_stable_fields(self) -> None:
+        contract = schemas.schema_contract("describe")
+
+        self.assertEqual(contract["schema_compatibility"], schemas.SCHEMA_COMPATIBILITY_VERSION)
+        self.assertEqual(contract["current_output_schema_version"], schemas.OUTPUT_SCHEMA_VERSION)
+        self.assertEqual(contract["supported_output_schema_versions"], [schemas.OUTPUT_SCHEMA_VERSION])
+        self.assertIn("summary", contract["stable_fields"])
+        self.assertIn("schema_version", contract["stable_fields"])
+
+    def test_parse_agent_output_records_current_schema_diagnostics(self) -> None:
+        raw = """
+<review_markdown>It updates parser behavior.</review_markdown>
+<findings_json>{"schema_version":"cursor-review-action/v1","command":"describe","summary":"Parser update"}</findings_json>
+"""
+
+        result = parser.parse_agent_output_result(raw, "describe")
+
+        self.assertTrue(result.parsed_ok)
+        self.assertEqual(result.diagnostics["schema"]["payload_schema_status"], "current")
+        self.assertEqual(result.diagnostics["schema"]["payload_schema_version"], schemas.OUTPUT_SCHEMA_VERSION)
+        self.assertTrue(result.diagnostics["schema"]["command_match"])
+
+    def test_parse_agent_output_accepts_legacy_missing_schema_version(self) -> None:
+        raw = """
+<review_markdown>It updates parser behavior.</review_markdown>
+<findings_json>{"command":"describe","summary":"Parser update"}</findings_json>
+"""
+
+        result = parser.parse_agent_output_result(raw, "describe")
+
+        self.assertTrue(result.parsed_ok)
+        self.assertEqual(result.diagnostics["schema"]["payload_schema_status"], "legacy_missing_schema_version")
+        self.assertEqual(result.diagnostics["schema"]["reason"], "legacy_missing_schema_version")
+        self.assertEqual(json.loads(result.findings_json)["summary"], "Parser update")
+
+    def test_parse_agent_output_rejects_unsupported_schema_version(self) -> None:
+        raw = """
+<review_markdown>It updates parser behavior.</review_markdown>
+<findings_json>{"schema_version":"cursor-review-action/v999","command":"describe","summary":"Parser update"}</findings_json>
+"""
+
+        result = parser.parse_agent_output_result(raw, "describe")
+
+        self.assertFalse(result.parsed_ok)
+        self.assertEqual(json.loads(result.findings_json), [])
+        self.assertEqual(result.diagnostics["reason"], "unsupported_schema_version")
+        self.assertEqual(result.diagnostics["schema"]["payload_schema_status"], "unsupported_schema_version")
+
+    def test_parse_agent_output_rejects_schema_command_mismatch(self) -> None:
+        raw = """
+<review_markdown>It updates parser behavior.</review_markdown>
+<findings_json>{"schema_version":"cursor-review-action/v1","command":"ask","summary":"Parser update"}</findings_json>
+"""
+
+        result = parser.parse_agent_output_result(raw, "describe")
+
+        self.assertFalse(result.parsed_ok)
+        self.assertEqual(result.diagnostics["reason"], "command_mismatch")
+        self.assertFalse(result.diagnostics["schema"]["command_match"])
 
     def test_parse_agent_output_falls_back_to_markdown_on_invalid_json(self) -> None:
         raw = """
@@ -807,6 +867,35 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Diff truncated: `true`", rendered)
         self.assertIn("Files reviewed: `2`", rendered)
         self.assertIn("Files skipped: `0`", rendered)
+
+    def test_render_comment_reports_schema_compatibility_diagnostics(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {"resolved_command": "describe", "model": "auto", "filter_mode": "added"},
+            {
+                "parser": {
+                    "reason": "valid_json",
+                    "fallback": "none",
+                    "schema": {
+                        "schema_compatibility": schemas.SCHEMA_COMPATIBILITY_VERSION,
+                        "payload_schema_status": "current",
+                        "payload_schema_version": schemas.OUTPUT_SCHEMA_VERSION,
+                        "command_match": True,
+                    },
+                }
+            },
+        )
+
+        self.assertIn("Output schema compatibility: `schema-compatibility/v1`", rendered)
+        self.assertIn("Output schema status: `current`", rendered)
+        self.assertIn("Output schema version: `cursor-review-action/v1`", rendered)
+        self.assertIn("Output schema command match: `true`", rendered)
 
     def test_render_comment_reports_context_presence_without_leaking_body(self) -> None:
         rendered = render.render_comment(

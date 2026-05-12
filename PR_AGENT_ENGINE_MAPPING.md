@@ -1266,6 +1266,19 @@ Implementation target:
 - `scripts/engine/schemas.py`
 - `docs/config-migration.md`
 
+Implementation evidence:
+
+- `scripts/engine/schemas.py` defines the current output and finding schema
+  versions, supported-version lists, stable fields, and
+  `schema-compatibility/v1` diagnostics.
+- `scripts/engine/parser.py` accepts current schemas, diagnoses legacy missing
+  `schema_version`, and routes unsupported versions or command mismatches into
+  the existing retry/fallback path.
+- `docs/config-migration.md` documents config/schema migration policy and the
+  maintainer checklist for future schema changes.
+- `tests/test_engine.py` covers current, legacy-missing, unsupported, and
+  command-mismatched schema outputs plus rendered diagnostics.
+
 Parity level:
 
 - `schema_version` in findings output: P0
