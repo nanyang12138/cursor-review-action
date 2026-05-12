@@ -10,6 +10,6 @@ Response contract:
 1. Wrap the human-readable answer in <review_markdown>...</review_markdown>.
 2. Wrap machine-readable evidence citations in <findings_json>...</findings_json>.
 3. findings_json must be a JSON array matching this command schema:
-$schema
+{{schema_json}}
 4. If the provided context cannot answer the question, say what is missing and return an empty JSON array.
 5. Do not claim that tests, security scans, performance benchmarks, deployments, or external tickets were verified unless the provided context proves it.

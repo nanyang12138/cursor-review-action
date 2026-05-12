@@ -24,7 +24,9 @@ def template_path_for_command(command: str) -> Path:
 
 
 def load_command_template(command: str) -> Template:
-    return Template(template_path_for_command(command).read_text(encoding="utf-8"))
+    raw_template = template_path_for_command(command).read_text(encoding="utf-8")
+    raw_template = raw_template.replace("{{schema_json}}", "$schema")
+    return Template(raw_template)
 
 
 def format_guidance_for_prompt(repo_guidance: Dict[str, Any]) -> str:
