@@ -1573,6 +1573,19 @@ Validation checklist:
 - Partial reviews clearly say why they are partial.
 - Persistent comment update includes run timestamp and head sha.
 
+Implementation evidence:
+
+- `scripts/engine/lifecycle.py` defines `review-lifecycle/v1` states and final
+  decision rules for `published`, `partial`, `failed`, and `skipped` runs.
+- Live, local dry-run, static help, disabled-command, and trigger-skip paths
+  attach final lifecycle diagnostics without adding progress comments or changing
+  public action inputs.
+- `docs/review-lifecycle.md` documents terminal state semantics, diagnostics
+  surfaces, compatibility boundaries, and P1/P2 deferrals.
+- `tests/test_engine.py::ReviewLifecycleTests` and entrypoint tests cover
+  lifecycle finalization, rendered diagnostics, trigger skip, help, and local
+  dry-run evidence.
+
 ### Multi-Stage Metadata Cache
 
 PR-Agent behavior to learn from:

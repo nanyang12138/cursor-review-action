@@ -121,7 +121,7 @@ todos:
     status: completed
   - id: review-lifecycle
     content: 建立 queued/context/diff/cursor/parser/published/failed/partial 生命周期状态和 diagnostics
-    status: pending
+    status: completed
   - id: metadata-cache
     content: 定义 describe metadata 复用规则，必须按 command/head sha/schema version 校验并允许禁用
     status: pending

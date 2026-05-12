@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
+from .lifecycle import lifecycle_diagnostics
 from .redaction import combine_results, privacy_diagnostics, redact_text
 from .taxonomy import taxonomy_summary
 
@@ -31,6 +32,29 @@ def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
     return diagnostics
 
 
+def _lifecycle_diagnostics(settings: Dict[str, Any]) -> List[str]:
+    lifecycle = settings.get("lifecycle") or {}
+    if not lifecycle:
+        return []
+    diagnostic = lifecycle_diagnostics(lifecycle)
+    lines = [
+        f"- Lifecycle schema: `{diagnostic.get('schema_version', 'unknown')}`",
+        f"- Lifecycle final state: `{diagnostic.get('final_state', 'unknown')}`",
+        f"- Lifecycle reason: `{diagnostic.get('reason', 'unknown')}`",
+        f"- Lifecycle stages: `{' -> '.join(diagnostic.get('state_sequence') or []) or 'unknown'}`",
+        f"- Lifecycle terminal: `{str(diagnostic.get('terminal', False)).lower()}`",
+        f"- Lifecycle cursor contacted: `{str(diagnostic.get('cursor_contacted', False)).lower()}`",
+        f"- Lifecycle should comment: `{str(diagnostic.get('should_comment', True)).lower()}`",
+    ]
+    if diagnostic.get("partial_reason"):
+        lines.append(f"- Lifecycle partial reason: `{diagnostic.get('partial_reason')}`")
+    if diagnostic.get("failed_stage"):
+        lines.append(f"- Lifecycle failed stage: `{diagnostic.get('failed_stage')}`")
+    if diagnostic.get("publish_decision"):
+        lines.append(f"- Lifecycle publish decision: `{diagnostic.get('publish_decision')}`")
+    return lines
+
+
 def _localization_diagnostics(settings: Dict[str, Any]) -> List[str]:
     localization = settings.get("language_diagnostics") or {}
     if not localization:
@@ -57,6 +81,7 @@ def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str,
     ]
     diagnostics.extend(_localization_diagnostics(settings))
     diagnostics.extend(_run_state_diagnostics(settings))
+    diagnostics.extend(_lifecycle_diagnostics(settings))
     return f"""Cursor review skipped before contacting Cursor.
 
 Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
@@ -107,6 +132,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Cursor exit code: `{exit_code}`",
     ]
     diagnostics.extend(_run_state_diagnostics(settings))
+    diagnostics.extend(_lifecycle_diagnostics(settings))
     parser_diagnostics = runner_diagnostics.get("parser") or {}
     if parser_diagnostics:
         diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")

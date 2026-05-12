@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, localization, parser, prompts, quality_gate, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, lifecycle, localization, parser, prompts, quality_gate, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -152,6 +152,86 @@ class RunStateTests(unittest.TestCase):
         self.assertTrue(comment.startswith("<!-- cursor-review-action-meta:"))
         payload = comment.removeprefix("<!-- cursor-review-action-meta:").removesuffix(" -->")
         self.assertEqual(json.loads(payload), metadata)
+
+
+class ReviewLifecycleTests(unittest.TestCase):
+    def test_lifecycle_finalizes_published_partial_and_failed_states(self) -> None:
+        base = lifecycle.start_lifecycle("review", {"run_id": "1001", "head_sha": "abc"})
+        base = lifecycle.advance_lifecycle(base, lifecycle.COLLECTING_CONTEXT, "building_review_context")
+        base = lifecycle.advance_lifecycle(base, lifecycle.SELECTING_DIFF, "selected_review_diff")
+        base = lifecycle.advance_lifecycle(base, lifecycle.CALLING_CURSOR, "calling_cursor_cli")
+        base = lifecycle.advance_lifecycle(base, lifecycle.PARSING_OUTPUT, "parsing_cursor_output")
+
+        published = lifecycle.finalize_lifecycle(
+            base,
+            exit_code=0,
+            parsed_ok=True,
+            diff_truncated=False,
+            quality_gate={"publish_decision": "publish"},
+            cursor_contacted=True,
+            should_comment=True,
+        )
+        partial = lifecycle.finalize_lifecycle(
+            base,
+            exit_code=0,
+            parsed_ok=True,
+            diff_truncated=True,
+            quality_gate={"publish_decision": "publish_partial"},
+            cursor_contacted=True,
+            should_comment=True,
+        )
+        failed = lifecycle.finalize_lifecycle(
+            base,
+            exit_code=1,
+            parsed_ok=False,
+            diff_truncated=False,
+            quality_gate={"publish_decision": "fail_before_publish"},
+            cursor_contacted=True,
+            should_comment=True,
+            failure_stage="calling_cursor",
+        )
+
+        self.assertEqual(published["final_state"], "published")
+        self.assertEqual(partial["final_state"], "partial")
+        self.assertEqual(partial["partial_reason"], "partial_review")
+        self.assertEqual(failed["final_state"], "failed")
+        self.assertEqual(failed["failed_stage"], "calling_cursor")
+        self.assertEqual(
+            published["state_sequence"],
+            ["queued", "collecting_context", "selecting_diff", "calling_cursor", "parsing_output", "published"],
+        )
+
+    def test_render_comment_includes_lifecycle_diagnostics(self) -> None:
+        run_lifecycle = lifecycle.finalize_lifecycle(
+            lifecycle.start_lifecycle("review"),
+            exit_code=0,
+            parsed_ok=True,
+            diff_truncated=False,
+            quality_gate={"publish_decision": "publish"},
+            cursor_contacted=True,
+            should_comment=True,
+        )
+
+        rendered = render.render_comment(
+            "No issues found.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["app.py"]},
+            {
+                "resolved_command": "review",
+                "model": "auto",
+                "filter_mode": "added",
+                "lifecycle": run_lifecycle,
+            },
+            {"runner": "cursor_cli", "cursor_contacted": True, "failure_kind": "none"},
+        )
+
+        self.assertIn("Lifecycle schema: `review-lifecycle/v1`", rendered)
+        self.assertIn("Lifecycle final state: `published`", rendered)
+        self.assertIn("Lifecycle stages: `queued -> published`", rendered)
 
 
 class ConfigTests(unittest.TestCase):
@@ -1915,6 +1995,7 @@ class EntrypointTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("No issues found.", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
+            self.assertIn("Lifecycle final state: `published`", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             self.assertIn("comment_marker", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
@@ -1976,10 +2057,12 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("Stored dry-run result.", rendered)
             self.assertIn("Runner: `local_dry_run`", rendered)
             self.assertIn("Cursor contacted: `false`", rendered)
+            self.assertIn("Lifecycle final state: `published`", rendered)
             self.assertIn("Dry-run output source: `stored_file`", rendered)
             self.assertEqual(json.loads((root / "findings.json").read_text(encoding="utf-8")), [])
             self.assertEqual(diagnostics["mode"], "local_dry_run")
             self.assertFalse(diagnostics["cursor_contacted"])
+            self.assertEqual(diagnostics["lifecycle"]["final_state"], "published")
             self.assertIn("should_comment<<", outputs)
             self.assertIn("false", outputs)
 
@@ -2012,6 +2095,7 @@ class EntrypointTests(unittest.TestCase):
             rendered = (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8")
             outputs = (Path(tmp) / "outputs.txt").read_text(encoding="utf-8")
             self.assertIn("untrusted_author_association", rendered)
+            self.assertIn("Lifecycle final state: `skipped`", rendered)
             self.assertIn("should_comment<<", outputs)
             self.assertIn("false", outputs)
 
@@ -2044,6 +2128,7 @@ class EntrypointTests(unittest.TestCase):
             outputs = (Path(tmp) / "outputs.txt").read_text(encoding="utf-8")
             self.assertIn("Cursor Review Action Help", rendered)
             self.assertIn("Cursor contacted: `false`", rendered)
+            self.assertIn("Lifecycle final state: `published`", rendered)
             self.assertNotIn("/cursor-improve -", rendered)
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", outputs)

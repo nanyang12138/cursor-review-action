@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 
 from .config import split_csv
+from .lifecycle import lifecycle_diagnostics
 
 
 COMMANDS = [
@@ -58,6 +59,8 @@ def render_help(settings: Dict[str, Any]) -> str:
     config_path = str(settings.get("config_path") or ".cursor-review.yml")
     trigger_source = str(settings.get("command_prompt_source") or "unknown")
     language = str(settings.get("language") or "zh-CN")
+    lifecycle = lifecycle_diagnostics(settings.get("lifecycle") or {})
+    lifecycle_stages = " -> ".join(lifecycle.get("state_sequence") or []) or "unknown"
 
     return f"""# Cursor Review Action Help
 
@@ -101,6 +104,10 @@ Unknown arguments are treated as prompt text and are never executed as shell.
 - Enabled commands: `{", ".join(enabled) or "none"}`
 - Language: `{language}`
 - Cursor contacted: `false`
+- Lifecycle schema: `{lifecycle.get("schema_version", "unknown")}`
+- Lifecycle final state: `{lifecycle.get("final_state", "unknown")}`
+- Lifecycle reason: `{lifecycle.get("reason", "unknown")}`
+- Lifecycle stages: `{lifecycle_stages}`
 
 </details>
 """
