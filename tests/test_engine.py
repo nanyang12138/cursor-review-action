@@ -654,9 +654,10 @@ class ComparisonProtocolTests(unittest.TestCase):
         reports_dir = ROOT / "docs" / "parity-reports"
         readme = (reports_dir / "README.md").read_text(encoding="utf-8")
         template = (reports_dir / "template.md").read_text(encoding="utf-8")
+        normalized_readme = " ".join(readme.split())
 
-        self.assertIn("Do not copy PR-Agent source code", readme)
-        self.assertIn("Gap decision and owner document", readme)
+        self.assertIn("Do not copy PR-Agent source code", normalized_readme)
+        self.assertIn("Gap decision and owner document", normalized_readme)
         self.assertIn("Decision: backlog | deferred | non-goal", template)
         self.assertIn("Cursor-native evidence", template)
 
