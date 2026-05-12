@@ -13,6 +13,9 @@ DEFAULTS: Dict[str, Any] = {
     "review_focus": "correctness,security,performance,tests,edge-cases",
     "max_findings": 5,
     "max_diff_bytes": 120000,
+    "max_files": 0,
+    "max_hunks": 0,
+    "max_cursor_calls": 1,
     "timeout_seconds": 600,
     "filter_mode": "added",
     "pr_title": "",
@@ -144,6 +147,9 @@ def load_settings() -> Dict[str, Any]:
         "review_focus": env("INPUT_REVIEW_FOCUS", DEFAULTS["review_focus"]),
         "max_findings": env("INPUT_MAX_FINDINGS", str(DEFAULTS["max_findings"])),
         "max_diff_bytes": env("INPUT_MAX_DIFF_BYTES", str(DEFAULTS["max_diff_bytes"])),
+        "max_files": env("INPUT_MAX_FILES", str(DEFAULTS["max_files"])),
+        "max_hunks": env("INPUT_MAX_HUNKS", str(DEFAULTS["max_hunks"])),
+        "max_cursor_calls": env("INPUT_MAX_CURSOR_CALLS", str(DEFAULTS["max_cursor_calls"])),
         "timeout_seconds": env("INPUT_TIMEOUT_SECONDS", str(DEFAULTS["timeout_seconds"])),
         "filter_mode": env("INPUT_FILTER_MODE", DEFAULTS["filter_mode"]),
         "include_patterns": env("INPUT_INCLUDE_PATTERNS", ""),
@@ -158,8 +164,11 @@ def load_settings() -> Dict[str, Any]:
     settings.update(repo_config)
 
     settings["max_findings"] = to_int(settings.get("max_findings"), DEFAULTS["max_findings"])
-    settings["max_diff_bytes"] = to_int(settings.get("max_diff_bytes"), DEFAULTS["max_diff_bytes"])
-    settings["timeout_seconds"] = to_int(settings.get("timeout_seconds"), DEFAULTS["timeout_seconds"])
+    settings["max_diff_bytes"] = max(to_int(settings.get("max_diff_bytes"), DEFAULTS["max_diff_bytes"]), 0)
+    settings["max_files"] = max(to_int(settings.get("max_files"), DEFAULTS["max_files"]), 0)
+    settings["max_hunks"] = max(to_int(settings.get("max_hunks"), DEFAULTS["max_hunks"]), 0)
+    settings["max_cursor_calls"] = max(to_int(settings.get("max_cursor_calls"), DEFAULTS["max_cursor_calls"]), 1)
+    settings["timeout_seconds"] = max(to_int(settings.get("timeout_seconds"), DEFAULTS["timeout_seconds"]), 1)
     settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
     settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
     settings["cursor_api_key_present"] = bool(env("CURSOR_API_KEY").strip())
