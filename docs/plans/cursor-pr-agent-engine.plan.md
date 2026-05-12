@@ -64,7 +64,7 @@ todos:
     status: completed
   - id: budget-controls
     content: 增加 max_files、max_hunks、max_cursor_calls、timeout_seconds 等预算控制和诊断
-    status: pending
+    status: completed
   - id: parser-retry
     content: 实现结构化 JSON parser、一次 retry 和 markdown 降级路径
     status: pending
