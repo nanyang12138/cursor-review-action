@@ -1,0 +1,69 @@
+{
+  "name": "security_finding",
+  "capability_ids": [
+    "CMD-REVIEW-P0",
+    "PROMPT-REVIEW-P0",
+    "PARSER-FALLBACK-P0",
+    "PUB-PERSISTENT-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "security",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/app/auth.py b/app/auth.py\n@@ -10,6 +10,7 @@ def login(request):\n     user = authenticate(request)\n+    session[\"is_admin\"] = request.args.get(\"admin\") == \"1\"\n     return redirect(\"/\")\n",
+    "stat": " app/auth.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "app/auth.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "app/auth.py",
+          "bytes": 184,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "102",
+        "title": "Add admin shortcut",
+        "body": "Lets local admins test admin flows.",
+        "base_ref": "main",
+        "head_ref": "feature/admin-shortcut",
+        "commit_messages": [
+          "Add admin shortcut"
+        ],
+        "changed_files": [
+          "app/auth.py"
+        ],
+        "diff_stat": "app/auth.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Found a security issue in `app/auth.py`.</review_markdown>\n<findings_json>[{\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"app/auth.py\",\"line\":12,\"title\":\"Do not trust query parameters for admin state\",\"body\":\"A caller can set admin=1 and receive an admin session flag.\",\"suggestion\":\"Derive admin status from authenticated user authorization data only.\",\"evidence\":\"session[\\\"is_admin\\\"] = request.args.get(\\\"admin\\\") == \\\"1\\\"\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "Review focus: security.",
+      "\"changed_files\": [",
+      "app/auth.py"
+    ],
+    "markdown_contains": [
+      "Found a security issue"
+    ],
+    "rendered_contains": [
+      "Found a security issue in `app/auth.py`.",
+      "Files reviewed: `1`",
+      "Findings JSON parsed: `true`"
+    ]
+  }
+}

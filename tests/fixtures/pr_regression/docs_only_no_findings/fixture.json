@@ -1,0 +1,73 @@
+{
+  "name": "docs_only_no_findings",
+  "capability_ids": [
+    "CMD-REVIEW-P0",
+    "CTX-METADATA-P0",
+    "PROMPT-REVIEW-P0",
+    "PARSER-FALLBACK-P0",
+    "PUB-PERSISTENT-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "correctness,tests",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/README.md b/README.md\n@@ -1,2 +1,4 @@\n # Project\n+\n+Adds setup instructions for local contributors.\n",
+    "stat": " README.md | 2 ++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "README.md"
+      ],
+      "reviewed_files": [
+        {
+          "path": "README.md",
+          "bytes": 121,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "101",
+        "title": "Document local setup",
+        "body": "Adds contributor setup instructions.",
+        "base_ref": "main",
+        "head_ref": "docs/setup",
+        "commit_messages": [
+          "Update README setup"
+        ],
+        "changed_files": [
+          "README.md"
+        ],
+        "diff_stat": "README.md | 2 ++"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>No actionable issues found.</review_markdown>\n<findings_json>[]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 0,
+    "prompt_contains": [
+      "Review this pull request",
+      "\"title\": \"Document local setup\"",
+      "README.md | 2 ++"
+    ],
+    "markdown_contains": [
+      "No actionable issues found."
+    ],
+    "rendered_contains": [
+      "No actionable issues found.",
+      "Files reviewed: `1`",
+      "Findings JSON parsed: `true`"
+    ],
+    "rendered_not_contains": [
+      "Adds contributor setup instructions."
+    ]
+  }
+}

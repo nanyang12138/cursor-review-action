@@ -1,0 +1,66 @@
+{
+  "name": "ask_question",
+  "capability_ids": [
+    "CMD-ASK-P1",
+    "PROMPT-COMMAND-SCHEMA-P0",
+    "PARSER-COMMAND-SCHEMA-P1"
+  ],
+  "command": "ask",
+  "user_prompt": "Which files change authentication behavior?",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "enabled_commands": "review,ask"
+  },
+  "context": {
+    "diff_text": "diff --git a/app/auth.py b/app/auth.py\n@@ -1,3 +1,4 @@\n+require_mfa(user)\n",
+    "stat": " app/auth.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "app/auth.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "app/auth.py",
+          "bytes": 76,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "104",
+        "title": "Require MFA during login",
+        "body": "Adds MFA enforcement.",
+        "base_ref": "main",
+        "head_ref": "feature/mfa",
+        "commit_messages": [
+          "Require MFA"
+        ],
+        "changed_files": [
+          "app/auth.py"
+        ],
+        "diff_stat": "app/auth.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>`app/auth.py` changes authentication by adding MFA enforcement.</review_markdown>\n<findings_json>{\"schema_version\":\"cursor-review-action/v1\",\"command\":\"ask\",\"answer\":\"app/auth.py adds MFA enforcement during login.\",\"evidence\":[\"app/auth.py: require_mfa(user)\"],\"limitations\":[],\"follow_up_questions\":[]}</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "object",
+    "prompt_contains": [
+      "Answer the user's question",
+      "Which files change authentication behavior?",
+      "\"command\": \"ask\""
+    ],
+    "markdown_contains": [
+      "`app/auth.py` changes authentication"
+    ],
+    "rendered_contains": [
+      "`app/auth.py` changes authentication by adding MFA enforcement.",
+      "Command: `ask`",
+      "Findings JSON parsed: `true`"
+    ]
+  }
+}

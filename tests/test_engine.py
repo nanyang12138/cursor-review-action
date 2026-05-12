@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, parser, prompts, render, runner, run_state, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, parser, prompts, render, runner, run_state, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -609,6 +609,34 @@ class TriggerTrustPolicyTests(unittest.TestCase):
 
         self.assertTrue(decision.allowed)
         self.assertEqual(decision.reason, "trusted_issue_comment_command")
+
+
+class FixtureRegressionTests(unittest.TestCase):
+    def test_pr_regression_fixtures_match_prompt_parser_render_contract(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        fixture_paths = fixtures.discover_fixture_paths(fixture_root)
+
+        self.assertGreaterEqual(len(fixture_paths), 5)
+        for fixture_path in fixture_paths:
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                result = fixtures.run_fixture(fixture)
+
+                self.assertEqual(fixtures.validate_fixture(fixture, result), [])
+
+    def test_pr_regression_fixtures_have_capability_trace_files(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                capabilities_path = fixture_path.parent / "capabilities.txt"
+                self.assertTrue(capabilities_path.exists())
+                capabilities = [
+                    line.strip()
+                    for line in capabilities_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                self.assertEqual(capabilities, fixture["capability_ids"])
 
 
 class RunnerContractTests(unittest.TestCase):
