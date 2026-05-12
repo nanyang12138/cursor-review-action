@@ -17,7 +17,7 @@ def parse_agent_output(raw: str) -> Tuple[str, str, bool]:
     if findings_raw:
         try:
             parsed = json.loads(findings_raw)
-            if isinstance(parsed, list):
+            if isinstance(parsed, (dict, list)):
                 findings_raw = json.dumps(parsed, ensure_ascii=False, indent=2)
                 parsed_ok = True
         except Exception:
