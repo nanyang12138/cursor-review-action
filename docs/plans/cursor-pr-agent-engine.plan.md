@@ -49,7 +49,7 @@ todos:
     status: completed
   - id: runner-contract
     content: 建立 Cursor runner contract，分类 install/auth/model/runtime/output failure，并保留未来 Cursor SDK runner 接口
-    status: pending
+    status: completed
   - id: command-args
     content: 实现安全的 slash command 参数解析，例如 --focus、--max-findings，并禁止任意参数进入 shell
     status: pending

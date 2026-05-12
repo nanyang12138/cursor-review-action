@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import commands, config, context, parser, prompts, render  # noqa: E402
+from engine import commands, config, context, parser, prompts, render, runner  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -138,6 +138,56 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Files reviewed: `2`", rendered)
 
 
+class RunnerContractTests(unittest.TestCase):
+    def test_run_cursor_result_records_success_contract(self) -> None:
+        completed = mock.Mock(returncode=0, stdout="ok", stderr="")
+        with mock.patch.object(runner, "run_command", return_value=completed) as run_command:
+            result = runner.run_cursor_result("prompt", {"model": "auto", "resolved_command": "review"})
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.raw_text, "ok")
+        self.assertEqual(result.failure_kind, "none")
+        self.assertEqual(result.model, "auto")
+        self.assertEqual(result.command_name, "review")
+        self.assertEqual(result.timeout_seconds, 600)
+        self.assertEqual(result.diagnostics["requested_model"], "auto")
+        run_command.assert_called_once()
+        self.assertEqual(run_command.call_args.kwargs["timeout"], 600)
+
+    def test_run_cursor_result_classifies_install_failure(self) -> None:
+        with mock.patch.object(runner, "run_command", side_effect=FileNotFoundError()):
+            result = runner.run_cursor_result("prompt", {"model": "auto"})
+
+        self.assertEqual(result.exit_code, 127)
+        self.assertEqual(result.failure_kind, "install")
+        self.assertIn("not found", result.stderr)
+
+    def test_run_cursor_result_classifies_auth_model_runtime_and_output_failures(self) -> None:
+        cases = [
+            (1, "", "Unauthorized API key", "auth"),
+            (2, "", "Unknown model requested", "model"),
+            (3, "", "Unexpected failure", "runtime"),
+            (0, "   ", "", "output"),
+        ]
+        for exit_code, stdout, stderr, expected in cases:
+            with self.subTest(expected=expected):
+                completed = mock.Mock(returncode=exit_code, stdout=stdout, stderr=stderr)
+                with mock.patch.object(runner, "run_command", return_value=completed):
+                    result = runner.run_cursor_result("prompt", {"model": "auto"})
+
+                self.assertEqual(result.failure_kind, expected)
+
+    def test_run_cursor_result_classifies_timeout_as_runtime(self) -> None:
+        timeout = runner.subprocess.TimeoutExpired(cmd=["agent"], timeout=5, output="partial", stderr="late")
+        with mock.patch.object(runner, "run_command", side_effect=timeout):
+            result = runner.run_cursor_result("prompt", {"model": "auto", "timeout_seconds": 5})
+
+        self.assertEqual(result.exit_code, 124)
+        self.assertEqual(result.raw_text, "partial")
+        self.assertEqual(result.failure_kind, "runtime")
+        self.assertIn("timed out", result.stderr)
+
+
 class EntrypointTests(unittest.TestCase):
     def test_main_orchestrates_engine_modules_without_cursor_api(self) -> None:
         fake_context = context.ReviewContext(
@@ -150,6 +200,27 @@ class EntrypointTests(unittest.TestCase):
 <review_markdown>No issues found.</review_markdown>
 <findings_json>[]</findings_json>
 """
+        fake_runner_result = runner.CursorRunResult(
+            raw_text=fake_output,
+            exit_code=0,
+            stderr="",
+            duration_seconds=0.01,
+            retry_count=0,
+            failure_kind="none",
+            model="auto",
+            command_name="review",
+            timeout_seconds=600,
+            diagnostics={
+                "runner": "cursor_cli",
+                "command": "review",
+                "requested_model": "auto",
+                "exit_code": 0,
+                "failure_kind": "none",
+                "duration_seconds": 0.01,
+                "retry_count": 0,
+                "timeout_seconds": 600,
+            },
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             env = {
@@ -161,7 +232,7 @@ class EntrypointTests(unittest.TestCase):
             }
             with mock.patch.dict(os.environ, env, clear=True):
                 with mock.patch.object(cursor_review, "build_review_context", return_value=fake_context):
-                    with mock.patch.object(cursor_review, "run_cursor", return_value=(0, fake_output, "")):
+                    with mock.patch.object(cursor_review, "run_cursor_result", return_value=fake_runner_result):
                         cwd = os.getcwd()
                         os.chdir(tmp)
                         try:
