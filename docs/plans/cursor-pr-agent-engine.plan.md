@@ -130,7 +130,7 @@ todos:
     status: pending
   - id: fixture-inventory
     content: 建立最低 fixture inventory，覆盖 docs-only、安全、大 PR、invalid config、fork PR、invalid model output 等正反案例
-    status: pending
+    status: completed
   - id: finding-grounding
     content: 建立 selected-diff line index，验证 parsed findings 的 file/line/evidence anchor，并降级 invalid anchors
     status: completed
@@ -456,13 +456,15 @@ flowchart TD
 - Redaction failure 会阻止 raw comment publishing。
 - 当前未决问题全部已有默认决策，且记录在 `PR_AGENT_ENGINE_MAPPING.md` 的 `Resolved Open Questions` 与 Round K。
 - `v0.5` fixture gate 明确为 10 个 concrete fixtures，`v1` 目标为 20 个。
-- `v0.5` fixture volume gate 已由 18 个 no-Cursor concrete fixtures 覆盖，其中
+- `v0.5` fixture volume gate 与 `v1` fixture inventory target 已由 20 个
+  no-Cursor concrete fixtures 覆盖，其中
   invalid config 与 empty Cursor output 负向夹具已验证 safe fallback diagnostics，
   improve/repo-guidance 夹具已验证 `/cursor-improve` schema 与 guidance diagnostics，
   deleted-only、generated/lockfile 与 config-only 夹具已验证 anchor/skipped-file/config
   diagnostics，renamed-file 夹具已验证 old/new path alias grounding，
   many-small-file 夹具已验证 max-file budget coverage 与 selected-file anchoring；
-  `v1` 仍需继续扩展到 20 个，优先补齐 dogfooding-derived final-product 案例。
+  small-code-bug 夹具已验证 anchored `bug` taxonomy、selected-line grounding
+  与 quality-gate publishable diagnostics。
 - `file_only`、deleted-only、partial review、untrusted command、quality gate output 都有默认渲染/诊断策略。
 - Release checklist 通过后才能打稳定 tag。
 - README 明确说明这是 clean-room Cursor-native PR Agent，不复制 PR-Agent 代码。
