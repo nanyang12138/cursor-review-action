@@ -51,7 +51,12 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Trigger reason: `{trigger_trust.get('reason', 'unknown')}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
-    diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")
+    reviewed_files = meta.get("reviewed_files")
+    reviewed_count = len(reviewed_files) if isinstance(reviewed_files, list) else len(meta.get("files", []))
+    skipped_files = meta.get("skipped_files")
+    skipped_count = len(skipped_files) if isinstance(skipped_files, list) else 0
+    diagnostics.append(f"- Files reviewed: `{reviewed_count}`")
+    diagnostics.append(f"- Files skipped: `{skipped_count}`")
     pull_request_context = meta.get("pull_request_context") or {}
     if pull_request_context:
         commit_count = len(pull_request_context.get("commit_messages") or [])

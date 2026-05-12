@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, parser, prompts, render, runner, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, parser, prompts, render, runner, schemas, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -222,7 +222,51 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Review this pull request", prompt)
         self.assertIn("Additional user instructions from PR comment", prompt)
         self.assertIn("<review_markdown>", prompt)
+        self.assertIn('"kind": "review_finding"', prompt)
+        self.assertIn('"grounding": "anchored|file_only|unanchored|invalid"', prompt)
         self.assertIn('"diff_truncated": false', prompt)
+
+    def test_command_prompts_have_distinct_templates_and_schemas(self) -> None:
+        settings = {
+            "language": "en",
+            "max_findings": 3,
+            "review_focus": "correctness",
+            "model": "auto",
+            "config_loaded": "",
+        }
+        expected_phrases = {
+            "review": "Every actionable finding must cite selected diff",
+            "ask": "Do not perform a general review",
+            "improve": "Do not duplicate bug/security findings",
+            "describe": "Do not claim the PR body was updated",
+        }
+        expected_kinds = {
+            "review": "review_finding",
+            "ask": "answer",
+            "improve": "improvement_suggestion",
+            "describe": "pr_description",
+        }
+
+        rendered_prompts = {}
+        for command_name in sorted(expected_phrases):
+            rendered_prompts[command_name] = prompts.build_prompt(
+                command_name,
+                "User focus.",
+                "diff --git a/a.py b/a.py",
+                " a.py | 1 +",
+                False,
+                {"files": ["a.py"]},
+                settings,
+            )
+
+        for command_name, prompt in rendered_prompts.items():
+            with self.subTest(command=command_name):
+                self.assertIn(f"Command: {command_name}.", prompt)
+                self.assertIn(expected_phrases[command_name], prompt)
+                self.assertIn(f'"kind": "{expected_kinds[command_name]}"', prompt)
+                self.assertIn(schemas.SCHEMA_VERSION, prompt)
+
+        self.assertEqual(len(set(rendered_prompts.values())), 4)
 
     def test_build_prompt_includes_pull_request_context(self) -> None:
         settings = {
