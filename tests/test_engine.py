@@ -530,6 +530,47 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn('"title": "Add safer parser"', prompt)
         self.assertIn('"commit_messages": [', prompt)
 
+    def test_each_command_uses_distinct_template_and_schema(self) -> None:
+        settings = {
+            "language": "en",
+            "max_findings": 3,
+            "review_focus": "correctness",
+            "model": "auto",
+            "config_loaded": "",
+        }
+        expected = {
+            "review": ("Review this pull request", "cursor_review_findings"),
+            "ask": ("Do not perform a general code review", "cursor_ask_evidence"),
+            "improve": ("Do not repeat bug/security/test findings", "cursor_improve_suggestions"),
+            "describe": ("Do not update or imply that you updated the PR body", "cursor_describe_sections"),
+        }
+
+        for command, (task_text, schema_name) in expected.items():
+            with self.subTest(command=command):
+                prompt = prompts.build_prompt(
+                    command,
+                    "Keep the answer concise.",
+                    "diff --git a/a.py b/a.py",
+                    " a.py | 1 +",
+                    False,
+                    {"files": ["a.py"]},
+                    settings,
+                )
+
+                self.assertIn(task_text, prompt)
+                self.assertIn(schema_name, prompt)
+                self.assertIn(f'"prompt_template": "{command}.md"', prompt)
+                self.assertIn("Additional user instructions from PR comment", prompt)
+
+    def test_schema_contracts_keep_findings_json_as_json_array(self) -> None:
+        for command in ("review", "ask", "improve", "describe"):
+            with self.subTest(command=command):
+                schema = schemas.schema_for_command(command)
+
+                self.assertEqual(schema["type"], "array")
+                self.assertEqual(schema["schema_version"], "1.0")
+                self.assertIn("required", schema["items"])
+
     def test_parse_agent_output_formats_valid_findings_json(self) -> None:
         raw = """
 <review_markdown>No issues.</review_markdown>
