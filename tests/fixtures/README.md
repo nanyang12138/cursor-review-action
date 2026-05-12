@@ -6,7 +6,7 @@ parsing, and rendered diagnostics.
 
 Each concrete fixture must declare capability IDs so product parity claims can be
 traced back to repeatable evidence in `docs/parity-scorecard.md`. The harness
-currently has 13 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
+currently has 14 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
 volume gate while the `v1` target remains 20 fixtures. The review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
@@ -22,6 +22,8 @@ volume gate while the `v1` target remains 20 fixtures. The review harness covers
   improve-only guidance files.
 - `invalid_finding_anchor`: selected-diff grounding fixture that keeps an
   anchored finding while downgrading a skipped-file finding.
+- `deleted_line_anchor`: deleted-only diff fixture that validates `old_line` /
+  `line_side: old` grounding without requiring a new-side line anchor.
 - `duplicate_findings`: same-run deduplication fixture that collapses duplicate
   same-line findings before applying `max_findings`.
 - `invalid_model_output`: invalid model `<findings_json>` fixture that preserves

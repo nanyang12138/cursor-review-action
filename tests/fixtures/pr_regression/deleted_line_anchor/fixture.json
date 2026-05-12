@@ -1,0 +1,76 @@
+{
+  "name": "deleted_line_anchor",
+  "capability_ids": [
+    "DIFF-INDEX-P0",
+    "FINDING-GROUNDING-P0",
+    "OUTPUT-QUALITY-GATE-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "regression-risk",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/src/flags.py b/src/flags.py\n--- a/src/flags.py\n+++ b/src/flags.py\n@@ -20,4 +20,3 @@ FLAGS = {\n-    \"unsafe\": True,\n     \"safe\": True,\n }\n",
+    "stat": " src/flags.py | 1 -",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/flags.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/flags.py",
+          "bytes": 151,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "113",
+        "title": "Remove legacy unsafe flag",
+        "body": "Deletes a legacy feature flag entry from the runtime flag table.",
+        "base_ref": "main",
+        "head_ref": "feature/remove-unsafe-flag",
+        "commit_messages": [
+          "Remove legacy unsafe flag"
+        ],
+        "changed_files": [
+          "src/flags.py"
+        ],
+        "diff_stat": "src/flags.py | 1 -"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Deleted-line evidence was reviewed for the removed flag entry.</review_markdown>\n<findings_json>[{\"severity\":\"medium\",\"confidence\":\"high\",\"file\":\"src/flags.py\",\"line\":null,\"old_line\":20,\"line_side\":\"old\",\"title\":\"Confirm removing unsafe flag is compatible\",\"body\":\"Removing the legacy unsafe flag entry can be a compatibility risk if callers still read this key during rollout.\",\"suggestion\":\"Confirm no callers still depend on the removed flag or add a migration note for the rollout.\",\"evidence\":\"-    \\\"unsafe\\\": True\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "\"old_line\": \"changed old-side line number or null for deleted-line evidence\"",
+      "Remove legacy unsafe flag",
+      "src/flags.py | 1 -"
+    ],
+    "markdown_contains": [
+      "Deleted-line evidence was reviewed"
+    ],
+    "rendered_contains": [
+      "Grounding anchored findings: `1`",
+      "Quality gate decision: `publish`",
+      "Quality gate publishable findings: `1`",
+      "Files reviewed: `1`"
+    ],
+    "findings_json_contains": [
+      "\"grounding_status\": \"anchored\"",
+      "\"grounding_reason\": \"old_changed_line\"",
+      "\"line_side\": \"old\"",
+      "\"old_line\": 20"
+    ]
+  }
+}

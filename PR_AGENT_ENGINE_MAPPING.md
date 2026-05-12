@@ -1668,8 +1668,8 @@ Current action:
 
 - Defines the minimum fixture inventory and tracks concrete no-Cursor fixtures
   in `tests/fixtures/README.md` and `docs/parity-scorecard.md`.
-- As of the improve suggestions fixture, the suite has 13 concrete no-Cursor
-  fixtures: 11 PR regression fixtures, 1 output quality gate fixture, and 1
+- As of the deleted-line anchor fixture, the suite has 14 concrete no-Cursor
+  fixtures: 12 PR regression fixtures, 1 output quality gate fixture, and 1
   config-invalid fixture.
 
 Cursor-native implementation:
@@ -1730,7 +1730,11 @@ Implementation evidence:
 - `tests/fixtures/pr_regression/improve_suggestions` covers `/cursor-improve`
   command-specific structured output plus general and improve-only repo guidance
   diagnostics without repeating `/cursor-review` findings.
-- `tests/fixtures/README.md` records the 13 concrete no-Cursor fixtures and the
+- `tests/fixtures/pr_regression/deleted_line_anchor` covers deleted-only diff
+  evidence and verifies `old_line` / `line_side: old` grounding remains
+  publishable in summary comments while inline deleted-line comments stay
+  deferred.
+- `tests/fixtures/README.md` records the 14 concrete no-Cursor fixtures and the
   remaining `v1` target of 20 fixtures.
 - `docs/parity-scorecard.md` tracks `FIXTURE-HARNESS-P0` evidence and keeps the
   remaining final-product fixture blockers visible.
