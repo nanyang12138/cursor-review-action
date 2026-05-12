@@ -97,7 +97,7 @@ todos:
     status: completed
   - id: schema-evolution
     content: 为 structured outputs 增加 schema_version、兼容性测试和 config migration notes
-    status: pending
+    status: completed
   - id: human-review-workflow
     content: 明确 AI review 默认 advisory/non-blocking，不自动 approve，不默认阻塞 merge，并记录人工 override 方式
     status: pending

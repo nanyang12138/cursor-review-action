@@ -76,6 +76,18 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")
         diagnostics.append(f"- Parser fallback: `{parser_diagnostics.get('fallback', 'unknown')}`")
         diagnostics.append(f"- Parser repair retry count: `{parser_diagnostics.get('repair_retry_count', 0)}`")
+        schema_diagnostics = parser_diagnostics.get("schema") or {}
+        if schema_diagnostics:
+            diagnostics.append(
+                f"- Output schema compatibility: `{schema_diagnostics.get('schema_compatibility', 'unknown')}`"
+            )
+            diagnostics.append(
+                f"- Output schema status: `{schema_diagnostics.get('payload_schema_status', 'unknown')}`"
+            )
+            diagnostics.append(
+                f"- Output schema version: `{schema_diagnostics.get('payload_schema_version', 'unknown') or 'missing'}`"
+            )
+            diagnostics.append(f"- Output schema command match: `{str(schema_diagnostics.get('command_match', True)).lower()}`")
         for label, value in taxonomy_summary(parser_diagnostics.get("taxonomy") or {}):
             diagnostics.append(f"- {label}: `{str(value).lower() if isinstance(value, bool) else value}`")
         if parser_diagnostics.get("repair_skipped_reason"):
