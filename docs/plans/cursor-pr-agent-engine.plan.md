@@ -82,7 +82,7 @@ todos:
     status: completed
   - id: prompt-governance
     content: 将 prompt templates 版本化，建立 prompt change checklist、质量指标和 fixture 更新规则
-    status: pending
+    status: completed
   - id: finding-taxonomy
     content: 建立 finding taxonomy、severity/confidence/noise-control 规则和 schema_version
     status: completed

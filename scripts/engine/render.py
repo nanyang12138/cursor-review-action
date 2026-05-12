@@ -57,6 +57,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
     reviewed_count = len(reviewed_files) if reviewed_files is not None else len(meta.get("files", []))
     diagnostics = [
         f"- Command: `{settings.get('resolved_command')}`",
+        f"- Prompt template version: `{settings.get('prompt_template_version', 'unknown')}`",
         f"- Model: `{settings.get('model')}`",
         f"- Runner: `{runner_diagnostics.get('runner', 'cursor_cli')}`",
         f"- Runner failure kind: `{runner_diagnostics.get('failure_kind', 'none')}`",

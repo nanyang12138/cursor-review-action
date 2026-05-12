@@ -310,9 +310,19 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Additional user instructions from PR comment", prompt)
         self.assertIn("<review_markdown>", prompt)
         self.assertIn('"command": "review"', prompt)
+        self.assertIn(f'"prompt_template_version": "{prompts.prompt_template_version()}"', prompt)
         self.assertIn('"category": "bug|security|test_gap|performance|regression_risk|maintainability|docs|question"', prompt)
         self.assertIn('"severity": "critical|high|medium|low|info"', prompt)
         self.assertIn('"diff_truncated": false', prompt)
+
+    def test_prompt_templates_are_versioned_and_contract_checked(self) -> None:
+        self.assertEqual(prompts.prompt_template_version(), "prompt-template-v1")
+        for command in ("review", "ask", "improve", "describe"):
+            template_path = prompts.TEMPLATE_DIR / f"{command}.md"
+            template = template_path.read_text(encoding="utf-8")
+            self.assertIn("<review_markdown>", template)
+            self.assertIn("<findings_json>", template)
+            self.assertIn("{{schema_json}}", template)
 
     def test_build_prompt_uses_command_specific_template_and_schema(self) -> None:
         settings = {
@@ -500,10 +510,16 @@ class PromptParserRenderTests(unittest.TestCase):
             True,
             True,
             {"files": ["a.py", "b.py"]},
-            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+            {
+                "resolved_command": "review",
+                "model": "auto",
+                "filter_mode": "added",
+                "prompt_template_version": prompts.prompt_template_version(),
+            },
         )
 
         self.assertIn("No issues.", rendered)
+        self.assertIn("Prompt template version: `prompt-template-v1`", rendered)
         self.assertIn("Diff truncated: `true`", rendered)
         self.assertIn("Files reviewed: `2`", rendered)
         self.assertIn("Files skipped: `0`", rendered)

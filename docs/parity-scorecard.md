@@ -28,13 +28,13 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 | FIXTURE-HARNESS-P0 | P0 | Implemented in `scripts/engine/fixtures.py` | `tests/test_engine.py::FixtureRegressionTests` | Fixture diagnostics record fixture name, parser status, and capability IDs | Partial | Current harness has 5 concrete PR fixtures; v0.5 requires 10. |
 | COMPARISON-PROTOCOL-P1 | P1 | Implemented in `docs/parity-reports/README.md`, `template.md`, and initial gap log | `tests/test_engine.py::ComparisonProtocolTests` | Gap log requires release impact and backlog/deferred/non-goal decisions | No for protocol; sample volume remains a release gate | Initial suite maps 5 repository-owned samples and 6 gaps without copying PR-Agent output. |
 | TRACEABILITY-SCORECARD-P0 | P0 | Implemented in this scorecard and validated by unit tests | `tests/test_engine.py::FixtureRegressionTests` scorecard coverage test | Capability IDs now connect fixture evidence to release blockers | No | Keep this file updated with each capability PR. |
+| PROMPT-GOVERNANCE-P1 | P1 | Implemented in `docs/prompt-governance.md`, `scripts/engine/prompt_templates/VERSION`, and prompt diagnostics | `tests/test_engine.py::PromptParserRenderTests` prompt version and template contract tests | Prompt template version is included in prompt and PR comment diagnostics | No for governance; dogfooding metrics still feed later release gates | Prompt changes now have a checklist, metrics, fixture update rules, and clean-room guardrails. |
 
 ## Current release blockers
 
 These blockers are not failures of the scorecard itself; they are remaining final
 product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
-- `prompt-governance`: prompt change checklist and quality metrics are not documented.
 - `repo-guidance`: `.cursor-review-instructions.md` / `best_practices.md` injection is not implemented.
 - `local-dry-run`: no dedicated local dry-run command or documentation exists yet.
 - `privacy-logging`: redaction policy and token-like diagnostic safeguards are incomplete.

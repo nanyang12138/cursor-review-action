@@ -7,6 +7,13 @@ from .schemas import schema_text
 
 
 TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
+VERSION_FILE = TEMPLATE_DIR / "VERSION"
+
+
+def prompt_template_version() -> str:
+    if not VERSION_FILE.exists():
+        return "unversioned"
+    return VERSION_FILE.read_text(encoding="utf-8").strip() or "unversioned"
 
 
 def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any]) -> str:
@@ -38,6 +45,8 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
     pull_request_context = meta.get("pull_request_context", {})
     diagnostics = {
         "command": command,
+        "prompt_template_version": prompt_template_version(),
+        "prompt_template_name": command if (TEMPLATE_DIR / f"{command}.md").exists() else "review",
         "model": settings.get("model"),
         "language": settings.get("language"),
         "config_loaded": settings.get("config_loaded"),

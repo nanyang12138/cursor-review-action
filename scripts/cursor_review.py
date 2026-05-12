@@ -8,7 +8,7 @@ from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
 from engine.parser import build_repair_prompt, parse_agent_output_result
-from engine.prompts import build_prompt
+from engine.prompts import build_prompt, prompt_template_version
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
 from engine.run_state import build_run_state
@@ -66,6 +66,7 @@ def main() -> int:
         return 78 if settings.get("fail_on_error") else 0
 
     context = build_review_context(settings)
+    settings["prompt_template_version"] = prompt_template_version()
     prompt = build_prompt(
         command,
         user_prompt,
