@@ -51,6 +51,18 @@ code, prompts, schemas, tests, fixtures, or exact generated output.
 - New fixture needed:
 - Regression assertion:
 
+## Human acceptance rubric
+
+- real_issue_found:
+- false_positive_count:
+- missed_issue_count:
+- evidence_quality:
+- command_intent_respected:
+- output_conciseness:
+- diagnostics_usefulness:
+- skipped_content_transparency:
+- follow_up_action:
+
 ## Notes
 
 -
