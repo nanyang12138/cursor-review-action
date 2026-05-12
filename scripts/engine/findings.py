@@ -74,7 +74,7 @@ def _finding_sort_key(indexed_finding: Tuple[int, Dict[str, Any]]) -> Tuple[int,
     grounding = _GROUNDING_RANK.get(str(finding.get("grounding_status") or "").strip().lower(), 0)
     suppressed = 1 if finding.get("suppressed") else 0
     actionable = 1 if finding.get("suggestion") or finding.get("body") else 0
-    return (-severity, -confidence, -grounding, suppressed, -actionable, original_index)
+    return (suppressed, -grounding, -severity, -confidence, -actionable, original_index)
 
 
 def _max_findings(settings: Dict[str, Any]) -> int:
