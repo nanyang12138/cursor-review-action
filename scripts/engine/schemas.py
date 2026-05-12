@@ -1,85 +1,92 @@
+import copy
 import json
-from copy import deepcopy
 from typing import Any, Dict
 
 
-SCHEMA_VERSION = "cursor-review-action/v1"
-FINDING_SCHEMA_VERSION = "cursor-review-finding/v1"
-
-_REVIEW_FINDING = {
-    "schema_version": FINDING_SCHEMA_VERSION,
-    "category": "bug|security|test_gap|performance|regression_risk|maintainability|docs|question",
-    "severity": "critical|high|medium|low|info",
-    "confidence": "high|medium|low",
-    "file": "path relative to repository root, or empty string when not file-specific",
-    "line": "new-side line number as integer, or null when not line-specific",
-    "title": "short actionable finding title",
-    "body": "why this matters and what can go wrong",
-    "suggestion": "concrete fix or mitigation",
-    "evidence": "brief quote or description from the selected diff/context",
-    "noise_control": "actionable_review",
+COMMON_RESPONSE_WRAPPER: Dict[str, Any] = {
+    "review_markdown": "string with the human-readable response",
+    "findings_json": "JSON array matching the command schema below",
 }
 
-SCHEMAS: Dict[str, Dict[str, Any]] = {
+
+COMMAND_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "review": {
-        "schema_version": SCHEMA_VERSION,
-        "command": "review",
+        "schema_name": "cursor_review_findings",
+        "schema_version": "1.0",
         "type": "array",
-        "description": "Actionable review findings only.",
-        "items": _REVIEW_FINDING,
+        "items": {
+            "type": "object",
+            "required": ["severity", "file", "line", "title", "body", "confidence", "suggestion", "evidence"],
+            "properties": {
+                "severity": "critical | high | medium | low",
+                "file": "changed file path",
+                "line": "changed line number, or null when only file-level evidence is available",
+                "title": "short actionable finding title",
+                "body": "why this is a correctness, security, performance, test, or regression risk",
+                "confidence": "high | medium | low",
+                "suggestion": "concrete fix direction",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
+        },
     },
     "ask": {
-        "schema_version": SCHEMA_VERSION,
-        "command": "ask",
-        "type": "object",
-        "description": "Direct answer to the user's question, grounded in PR evidence.",
-        "properties": {
-            "answer": "direct answer in the requested language",
-            "evidence": ["file path, hunk, or PR-context references used to answer"],
-            "limitations": ["important uncertainty or missing context"],
-            "follow_up_questions": ["optional clarifying questions when the PR context is insufficient"],
+        "schema_name": "cursor_ask_evidence",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["file", "line", "question_relevance", "evidence"],
+            "properties": {
+                "file": "changed file path, or null for PR-level evidence",
+                "line": "changed line number, or null for PR-level evidence",
+                "question_relevance": "why this evidence answers the user question",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
     "improve": {
-        "schema_version": SCHEMA_VERSION,
-        "command": "improve",
-        "type": "object",
-        "description": "Prioritized improvement suggestions that are not duplicate bug findings.",
-        "properties": {
-            "suggestions": [
-                {
-                    "schema_version": FINDING_SCHEMA_VERSION,
-                    "priority": "high|medium|low",
-                    "category": "maintainability|readability|tests|performance|developer-experience",
-                    "file": "path relative to repository root, or empty string",
-                    "line": "new-side line number as integer, or null",
-                    "title": "short improvement title",
-                    "rationale": "why this change improves the PR",
-                    "suggestion": "specific implementation guidance",
-                    "evidence": "brief quote or description from selected diff/context",
-                }
-            ]
+        "schema_name": "cursor_improve_suggestions",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["priority", "file", "line", "title", "body", "confidence", "suggestion", "evidence"],
+            "properties": {
+                "priority": "high | medium | low",
+                "file": "changed file path, or null for PR-level suggestion",
+                "line": "changed line number, or null for PR-level suggestion",
+                "title": "short improvement title",
+                "body": "why the improvement is useful and not a duplicate review finding",
+                "confidence": "high | medium | low",
+                "suggestion": "concrete before/after guidance when safe",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
     "describe": {
-        "schema_version": SCHEMA_VERSION,
-        "command": "describe",
-        "type": "object",
-        "description": "PR description content for a comment-only summary.",
-        "properties": {
-            "summary": "concise summary of the PR",
-            "walkthrough": ["notable changed files or areas and what changed"],
-            "risks": ["risk or compatibility notes"],
-            "tests": ["tests observed in the PR or tests the author should run"],
-            "changelog": "optional user-facing changelog entry, or empty string",
+        "schema_name": "cursor_describe_sections",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["section", "content", "evidence"],
+            "properties": {
+                "section": "summary | walkthrough | risk | tests | changelog",
+                "content": "concise section content suitable for a PR comment",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
 }
 
 
 def schema_for_command(command: str) -> Dict[str, Any]:
-    return deepcopy(SCHEMAS.get(command, SCHEMAS["review"]))
+    return copy.deepcopy(COMMAND_SCHEMAS.get(command, COMMAND_SCHEMAS["review"]))
 
 
-def schema_text(command: str) -> str:
-    return json.dumps(schema_for_command(command), ensure_ascii=False, indent=2)
+def schema_contract_for_prompt(command: str) -> str:
+    contract = {
+        "response_wrapper": COMMON_RESPONSE_WRAPPER,
+        "command_schema": schema_for_command(command),
+    }
+    return json.dumps(contract, ensure_ascii=False, indent=2)
