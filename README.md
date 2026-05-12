@@ -1,6 +1,6 @@
 # Cursor Review Action
 
-A lightweight Cursor CLI powered pull request review bot for GitHub Actions.
+A clean-room, Cursor-native PR review engine for GitHub Actions, powered by Cursor CLI.
 
 Use this action when you want Cursor to review GitHub PRs, but you cannot enable Cursor Bugbot for the repository, do not have organization admin access, or want a simple workflow-based review bot that you can fully control.
 
@@ -22,6 +22,25 @@ This action is intentionally smaller:
 - It is easy to copy into personal repos, prototypes, and small team repos.
 - It checks trigger trust before contacting Cursor, so untrusted slash commands and fork PRs without secrets are skipped safely.
 - It is advisory by default: humans decide whether findings should block, and the action does not approve or merge PRs.
+
+## Product Positioning
+
+This repository is a clean-room, PR-Agent-inspired implementation. It learns from
+public PR-Agent product behavior and engine concepts, but it does not copy
+PR-Agent source code, prompts, schemas, tests, fixtures, or generated output as
+golden truth.
+
+The product goal is Cursor-native behavior rather than framework compatibility:
+
+- Cursor CLI is the execution layer, so model access, auth, and runtime
+  diagnostics stay aligned with Cursor.
+- GitHub Actions remains the distribution layer, so repositories can adopt the
+  bot with a normal workflow file and without installing a GitHub App.
+- The engine owns command routing, context building, diff selection, prompt
+  templates, structured parsing, grounding, quality gates, rendering, and
+  no-Cursor fixture regression.
+- Behavioral parity is tracked through capability IDs, fixtures, diagnostics,
+  and maintainer docs instead of claims of full PR-Agent product equivalence.
 
 ## What It Can Do
 
@@ -200,6 +219,31 @@ After `v1` is released, prefer:
 ```yaml
 uses: nanyang12138/cursor-review-action@v1
 ```
+
+## Compatibility Contract
+
+The stable surface is intentionally small and documented so workflows can adopt
+the action without inheriting every PR-Agent feature:
+
+- Stable action inputs include `cursor-api-key`, `github-token`, `base-sha`,
+  `head-sha`, `pr-number`, `event-name`, `comment-body`, `model`, `language`,
+  `comment-mode`, and `persistent-comment`.
+- Stable outputs include `summary`, `findings-json`, `exit-code`,
+  `diff-truncated`, and `comment-url`.
+- Stable repo config keys include `model`, `language`, `review_focus`,
+  `max_findings`, `max_diff_bytes`, `filter_mode`, `include_patterns`,
+  `exclude_patterns`, `persistent_comment`, `enabled_commands`,
+  `guidance_files`, `strict_args`, `timeout_seconds`, `fail_on_error`, and
+  `fail_on_findings`.
+- `/cursor-review` is the default stable command. `/cursor-ask`,
+  `/cursor-improve`, and `/cursor-describe` are available through explicit
+  command enablement while their UX continues to be validated.
+- Findings are advisory by default. The action does not approve, merge, release,
+  tag, or block PRs unless maintainers add separate workflow policy.
+
+See `PR_AGENT_ENGINE_MAPPING.md`, `docs/parity-scorecard.md`, and
+`docs/release-checklist.md` for the maintainer-facing compatibility and release
+gates.
 
 ## Step 3: Trigger a Review
 

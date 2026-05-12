@@ -2054,6 +2054,29 @@ class NonGoalsDocumentationTests(unittest.TestCase):
         self.assertIn("does not claim full PR-Agent product parity", normalized)
 
 
+class ReadmePositioningTests(unittest.TestCase):
+    def test_readme_documents_clean_room_cursor_native_positioning(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+
+        self.assertIn("clean-room, PR-Agent-inspired implementation", normalized)
+        self.assertIn("does not copy PR-Agent source code, prompts, schemas, tests, fixtures", normalized)
+        self.assertIn("Cursor CLI is the execution layer", normalized)
+        self.assertIn("GitHub Actions remains the distribution layer", normalized)
+        self.assertIn("Behavioral parity is tracked through capability IDs", normalized)
+
+    def test_readme_documents_public_compatibility_contract(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+
+        self.assertIn("## Compatibility Contract", readme)
+        self.assertIn("Stable action inputs include `cursor-api-key`", normalized)
+        self.assertIn("Stable outputs include `summary`, `findings-json`, `exit-code`", normalized)
+        self.assertIn("Stable repo config keys include `model`, `language`, `review_focus`", normalized)
+        self.assertIn("/cursor-review` is the default stable command", normalized)
+        self.assertIn("docs/release-checklist.md", normalized)
+
+
 class AcceptanceRubricTests(unittest.TestCase):
     REQUIRED_FIELDS = [
         "real_issue_found",

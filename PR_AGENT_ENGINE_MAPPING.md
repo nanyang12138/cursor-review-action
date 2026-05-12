@@ -2088,6 +2088,20 @@ Required:
 - dogfooding has passed on this repository's own PRs.
 - no known high-severity failure in normal GitHub Actions usage.
 
+Implementation evidence:
+
+- `README.md` now documents `DOCS-POSITIONING-P1` with clean-room
+  PR-Agent-inspired boundaries, Cursor-native execution/distribution advantages,
+  behavioral-parity evidence links, a public compatibility contract, limitations,
+  and stable release-gate references.
+- `tests/test_engine.py::ReadmePositioningTests` verifies that README
+  positioning does not imply source/prompt/schema/test/fixture reuse, does not
+  claim full PR-Agent product parity, and keeps stable versus experimental
+  public surfaces visible.
+- `docs/parity-scorecard.md` records `DOCS-POSITIONING-P1` as a non-blocking
+  documentation capability while keeping stable release authority with human
+  review of release and dogfooding evidence.
+
 ## Compatibility Contract
 
 Stable public API:

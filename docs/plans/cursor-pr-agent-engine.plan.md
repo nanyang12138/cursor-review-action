@@ -145,7 +145,7 @@ todos:
     status: completed
   - id: docs-positioning
     content: 更新 README，说明 clean-room PR-Agent-inspired architecture 与 Cursor-native 优势
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -473,6 +473,9 @@ flowchart TD
   明确 GitHub App、多平台、auto-fix、inline comments、labels、ticket
   integration、默认 PR body mutation、multi-call chunking、second critique、
   full PR-Agent parity claims 等 v1 非目标或延后能力，并由文档测试约束。
+- README 已记录 `DOCS-POSITIONING-P1`，说明 clean-room PR-Agent-inspired
+  边界、Cursor-native 架构优势、稳定兼容契约、实验命令边界与 release
+  gate 链接，并由 `ReadmePositioningTests` 约束。
 - Release checklist 通过后才能打稳定 tag。
 - README 明确说明这是 clean-room Cursor-native PR Agent，不复制 PR-Agent 代码。
 
