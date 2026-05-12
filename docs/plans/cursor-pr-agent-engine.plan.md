@@ -61,7 +61,7 @@ todos:
     status: pending
   - id: diff-selector
     content: 实现 token/bytes-aware diff selection，并输出 reviewed/skipped files
-    status: pending
+    status: completed
   - id: budget-controls
     content: 增加 max_files、max_hunks、max_cursor_calls、timeout_seconds 等预算控制和诊断
     status: pending

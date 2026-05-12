@@ -18,7 +18,13 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
     ]
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
-    diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")
+    reviewed_files = meta.get("reviewed_files") or [{"path": path} for path in meta.get("files", [])]
+    skipped_files = meta.get("skipped_files") or []
+    diagnostics.append(f"- Files reviewed: `{len(reviewed_files)}`")
+    diagnostics.append(f"- Files skipped: `{len(skipped_files)}`")
+    if skipped_files:
+        preview = ", ".join(f"{item.get('path')} ({item.get('reason')})" for item in skipped_files[:5])
+        diagnostics.append(f"- Skipped files: `{preview}`")
 
     if exit_code != 0:
         markdown = f"""Cursor review failed before producing a reliable result.
