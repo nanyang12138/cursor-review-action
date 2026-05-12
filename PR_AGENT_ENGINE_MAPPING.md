@@ -1216,11 +1216,11 @@ PR-Agent behavior to learn from:
 
 Current action:
 
-- README documents usage, but the PR command UX has no `/cursor-help`.
+- README documents usage, and the PR command UX has static `/cursor-help` plus `/cursor-review help`.
 
 Cursor-native implementation:
 
-- Add `/cursor-help` or `/cursor-review help` later.
+- `/cursor-help` and `/cursor-review help` render static help without contacting Cursor.
 - P0 docs stay in README.
 - P1 PR comment help lists:
   - enabled commands

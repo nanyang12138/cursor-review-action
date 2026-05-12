@@ -116,7 +116,8 @@ jobs:
          contains(github.event.comment.body, '/cursor-review') ||
          contains(github.event.comment.body, '/cursor-ask') ||
          contains(github.event.comment.body, '/cursor-improve') ||
-         contains(github.event.comment.body, '/cursor-describe')
+         contains(github.event.comment.body, '/cursor-describe') ||
+         contains(github.event.comment.body, '/cursor-help')
        ) &&
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
@@ -213,6 +214,7 @@ Manual commands run when a trusted user comments on the PR conversation:
 /cursor-ask
 /cursor-improve
 /cursor-describe
+/cursor-help
 ```
 
 You can add extra instructions:
@@ -223,7 +225,7 @@ Focus on architecture boundaries, missing tests, and risky edge cases.
 Do not summarize the whole PR.
 ```
 
-The text after the slash command is passed to Cursor as additional instructions.
+The text after review, ask, improve, and describe slash commands is passed to Cursor as additional instructions. `/cursor-help` and `/cursor-review help` render static help without contacting Cursor.
 
 ## Optional: Add a Repo Configuration File
 
@@ -358,9 +360,10 @@ Supported slash commands:
 /cursor-ask
 /cursor-improve
 /cursor-describe
+/cursor-help
 ```
 
-The recommended workflow and `.cursor-review.yml` enable all four commands. If you pass `enabled-commands` manually, include every command you want to allow.
+The recommended workflow and `.cursor-review.yml` enable the four Cursor-backed commands. Static help is always available through `/cursor-help` or `/cursor-review help` and lists only the Cursor-backed commands enabled for that run.
 
 `/cursor-review` supports a small allowlist of per-run arguments:
 

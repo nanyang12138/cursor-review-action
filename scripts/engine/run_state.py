@@ -10,6 +10,7 @@ COMMAND_TITLES = {
     "ask": "Cursor Ask",
     "improve": "Cursor Improve",
     "describe": "Cursor Describe",
+    "help": "Cursor Help",
 }
 
 

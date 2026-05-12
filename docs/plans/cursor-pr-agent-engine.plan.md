@@ -94,7 +94,7 @@ todos:
     status: completed
   - id: help-discoverability
     content: 增加 README 命令文档，后续提供 /cursor-help 或 /cursor-review help
-    status: pending
+    status: completed
   - id: schema-evolution
     content: 为 structured outputs 增加 schema_version、兼容性测试和 config migration notes
     status: pending

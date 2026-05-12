@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, parser, prompts, render, runner, run_state, scope, taxonomy, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, parser, prompts, render, runner, run_state, scope, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -28,6 +28,20 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(command, "ask")
         self.assertEqual(user_prompt, "Why did this change?")
         self.assertEqual(settings["command_prompt_source"], "slash_command")
+
+    def test_derives_static_help_command_aliases(self) -> None:
+        for body in ["/cursor-help", "/cursor-review help"]:
+            with self.subTest(body=body):
+                settings = {
+                    "command": "review",
+                    "comment_body": body,
+                }
+
+                command, user_prompt = commands.derive_command_and_prompt(settings)
+
+                self.assertEqual(command, "help")
+                self.assertEqual(user_prompt, "")
+                self.assertEqual(settings["command_prompt_source"], "slash_command")
 
     def test_explicit_user_prompt_keeps_configured_command(self) -> None:
         settings = {
@@ -46,6 +60,12 @@ class CommandTests(unittest.TestCase):
 
         self.assertFalse(enabled)
         self.assertEqual(message, "Command `ask` is not enabled. Enabled commands: review.")
+
+    def test_help_command_is_always_enabled(self) -> None:
+        enabled, message = commands.ensure_command_enabled("help", {"enabled_commands": "review"})
+
+        self.assertTrue(enabled)
+        self.assertEqual(message, "")
 
     def test_command_args_override_known_settings_and_preserve_prompt(self) -> None:
         result = command_args.parse_command_args(
@@ -875,6 +895,21 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("untrusted_author_association", rendered)
         self.assertNotIn("/cursor-review", rendered)
 
+    def test_render_help_lists_enabled_commands_only_and_no_cursor_call(self) -> None:
+        rendered = help_renderer.render_help(
+            {
+                "enabled_commands": "review,ask",
+                "config_path": ".cursor-review.yml",
+                "command_prompt_source": "slash_command",
+            }
+        )
+
+        self.assertIn("This static help response did not contact Cursor.", rendered)
+        self.assertIn("/cursor-review", rendered)
+        self.assertIn("/cursor-ask", rendered)
+        self.assertNotIn("/cursor-improve -", rendered)
+        self.assertIn("Cursor contacted: `false`", rendered)
+
 
 class TriggerTrustPolicyTests(unittest.TestCase):
     def test_trigger_fixture_decisions_match_expected_policy(self) -> None:
@@ -1159,6 +1194,42 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("untrusted_author_association", rendered)
             self.assertIn("should_comment<<", outputs)
             self.assertIn("false", outputs)
+
+    def test_main_renders_static_help_without_cursor_or_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "INPUT_COMMAND": "review",
+                "INPUT_ENABLED_COMMANDS": "review,ask",
+                "INPUT_COMMENT_BODY": "/cursor-help",
+                "INPUT_CONFIG_PATH": str(Path(tmp) / "missing.yml"),
+                "INPUT_EVENT_NAME": "issue_comment",
+                "INPUT_COMMENT_AUTHOR_ASSOCIATION": "CONTRIBUTOR",
+                "GITHUB_OUTPUT": str(Path(tmp) / "outputs.txt"),
+                "GITHUB_STEP_SUMMARY": str(Path(tmp) / "summary.md"),
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch.object(cursor_review, "build_review_context") as build_context:
+                    with mock.patch.object(cursor_review, "run_cursor_result") as run_cursor:
+                        cwd = os.getcwd()
+                        os.chdir(tmp)
+                        try:
+                            exit_code = cursor_review.main()
+                        finally:
+                            os.chdir(cwd)
+
+            self.assertEqual(exit_code, 0)
+            build_context.assert_not_called()
+            run_cursor.assert_not_called()
+            rendered = (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8")
+            outputs = (Path(tmp) / "outputs.txt").read_text(encoding="utf-8")
+            self.assertIn("Cursor Review Action Help", rendered)
+            self.assertIn("Cursor contacted: `false`", rendered)
+            self.assertNotIn("/cursor-improve -", rendered)
+            self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
+            self.assertIn("resolved_command", outputs)
+            self.assertIn("help", outputs)
+            self.assertIn("should_comment", outputs)
+            self.assertIn("true", outputs)
 
     def test_main_repairs_invalid_structured_output_when_budget_allows(self) -> None:
         fake_context = context.ReviewContext(
