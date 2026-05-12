@@ -33,6 +33,7 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 | BUDGET-CONTROLS-P1 | P1 | Implemented in `scripts/engine/budget.py`, `scripts/engine/diff_selector.py`, and `scripts/engine/runner.py` | `tests/fixtures/pr_regression/large_partial_review`; budget and runner unit tests | Budget limits, skipped files, and cursor-call attempts are visible | No | `max_cursor_calls` defaults to one. |
 | RUN-STATE-P0 | P0 | Implemented in `scripts/engine/run_state.py` and entrypoint outputs | `tests/test_engine.py::RunStateTests` and entrypoint tests | Run id, command marker, lifecycle state, head SHA, event name, and stale diagnostics are output | No | P0 stale-run support is diagnostic-only. |
 | SEC-TRIGGER-P0 | P0 | Implemented in `scripts/engine/trust_policy.py` before context construction or Cursor calls | `tests/fixtures/triggers/*.json`; trigger policy unit tests | Skip reason, trust level, event, fork state, and secret availability are reported | No | Untrusted issue comments and fork PRs without secrets do not call Cursor. |
+| SEC-PRIVACY-P0 | P0 | Implemented in `scripts/engine/redaction.py`, live-run artifact gating, and `docs/privacy-and-logging.md` | `tests/fixtures/privacy/token_like_output.json`; redaction, render, config, and entrypoint unit tests | Rendered comments report redaction schema/status/counts and debug artifact state | No | Live runs avoid raw prompt/raw output files by default; published surfaces use deterministic token-like redaction. |
 | FIXTURE-HARNESS-P0 | P0 | Implemented in `scripts/engine/fixtures.py` | `tests/test_engine.py::FixtureRegressionTests` | Fixture diagnostics record fixture name, parser status, and capability IDs | Partial | Current harness has 5 concrete PR fixtures; v0.5 requires 10. |
 | COMPARISON-PROTOCOL-P1 | P1 | Implemented in `docs/parity-reports/README.md`, `template.md`, and initial gap log | `tests/test_engine.py::ComparisonProtocolTests` | Gap log requires release impact and backlog/deferred/non-goal decisions | No for protocol; sample volume remains a release gate | Initial suite maps 5 repository-owned samples and 6 gaps without copying PR-Agent output. |
 | TRACEABILITY-SCORECARD-P0 | P0 | Implemented in this scorecard and validated by unit tests | `tests/test_engine.py::FixtureRegressionTests` scorecard coverage test | Capability IDs now connect fixture evidence to release blockers | No | Keep this file updated with each capability PR. |
@@ -45,7 +46,6 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 These blockers are not failures of the scorecard itself; they are remaining final
 product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
-- `privacy-logging`: redaction policy and token-like diagnostic safeguards are incomplete.
 - `review-lifecycle`: final lifecycle state diagnostics exist but lifecycle documentation and state model are incomplete.
 - `fixture-inventory`: the current suite has 6 concrete PR fixtures; v0.5 requires 10 and v1 targets 20.
 - `finding-grounding`: selected-diff line index and anchor validation are not implemented.

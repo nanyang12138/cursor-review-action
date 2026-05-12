@@ -884,6 +884,7 @@ PR-Agent behavior to learn from:
 Current action:
 
 - Security model mentions not logging secrets, but privacy/logging policy is not explicit.
+- Implemented `scripts/engine/redaction.py`, `docs/privacy-and-logging.md`, and default-off live debug artifacts for `SEC-PRIVACY-P0`.
 
 Cursor-native implementation:
 
@@ -919,6 +920,7 @@ Validation checklist:
 - Debug mode is off by default.
 - PR comment diagnostics never include secrets.
 - Raw selected diff is not printed by default.
+- `tests/fixtures/privacy/token_like_output.json` verifies token-like string masking.
 
 ### Dependency and Supply Chain Control
 

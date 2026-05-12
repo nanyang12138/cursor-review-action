@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, localization, parser, prompts, render, runner, run_state, schemas, scope, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -217,6 +217,7 @@ guidance_max_bytes: 1024
             "INPUT_TIMEOUT_SECONDS": "30",
             "INPUT_SCOPE_MODE": "files",
             "INPUT_SCOPE_FILES": "src/*.py,tests/*.py",
+            "INPUT_DEBUG_ARTIFACTS": "true",
             "CURSOR_API_KEY": "test-key",
         }
 
@@ -238,6 +239,7 @@ guidance_max_bytes: 1024
         self.assertEqual(settings["timeout_seconds"], 30)
         self.assertEqual(settings["scope_mode"], "files")
         self.assertEqual(settings["scope_files"], "src/*.py,tests/*.py")
+        self.assertTrue(settings["debug_artifacts"])
 
     def test_language_input_is_normalized_with_stable_diagnostics(self) -> None:
         env = {
@@ -1123,6 +1125,36 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Head SHA: `head`", rendered)
         self.assertIn("Idempotency key: `cursor-review-action:review:42:head`", rendered)
 
+    def test_redaction_fixture_masks_token_like_strings(self) -> None:
+        fixture = json.loads((ROOT / "tests" / "fixtures" / "privacy" / "token_like_output.json").read_text(encoding="utf-8"))
+
+        result = redaction.redact_text(fixture["input"], env=fixture["env"])
+
+        self.assertEqual(result.schema_version, redaction.REDACTION_SCHEMA_VERSION)
+        self.assertGreaterEqual(result.redacted_count, 3)
+        self.assertIn(fixture["placeholder"], result.text)
+        for value in fixture["must_not_contain"]:
+            self.assertNotIn(value, result.text)
+
+    def test_render_comment_redacts_markdown_stderr_and_reports_policy(self) -> None:
+        rendered = render.render_comment(
+            "Do not publish ghp_1234567890abcdefghijklmnopqrstuvwxyz.",
+            "[]",
+            1,
+            "secret=cursor_live_secret_12345",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added", "debug_artifacts": False},
+        )
+
+        self.assertIn("Privacy redaction schema: `redaction/v1`", rendered)
+        self.assertIn("Redaction status: `applied`", rendered)
+        self.assertIn("Debug artifacts enabled: `false`", rendered)
+        self.assertIn("[REDACTED]", rendered)
+        self.assertNotIn("ghp_1234567890abcdefghijklmnopqrstuvwxyz", rendered)
+        self.assertNotIn("cursor_live_secret_12345", rendered)
+
     def test_render_trigger_skip_reports_policy_without_raw_prompt(self) -> None:
         rendered = render.render_trigger_skip(
             {
@@ -1454,6 +1486,8 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("comment_marker", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             self.assertIn("run_metadata_json", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             self.assertIn("ci_policy_json", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
+            self.assertFalse((Path(tmp) / "cursor_review_prompt.txt").exists())
+            self.assertFalse((Path(tmp) / "cursor_review_raw.txt").exists())
             prompt = run_cursor.call_args.args[0]
             self.assertIn("Maximum findings: 2.", prompt)
             self.assertIn("Review focus: security, tests.", prompt)

@@ -13,6 +13,7 @@ from engine.help import render_help
 from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
 from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt, prompt_template_version
+from engine.redaction import combine_results, redact_text
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
 from engine.run_state import build_run_state
@@ -127,7 +128,8 @@ def main(argv: list[str] | None = None) -> int:
         context.meta,
         settings,
     )
-    Path("cursor_review_prompt.txt").write_text(prompt, encoding="utf-8")
+    if settings.get("debug_artifacts"):
+        Path("cursor_review_prompt.txt").write_text(redact_text(prompt).text, encoding="utf-8")
 
     runner_result = run_cursor_result(prompt, settings)
     exit_code = runner_result.exit_code
@@ -176,7 +178,23 @@ def main(argv: list[str] | None = None) -> int:
     runner_diagnostics["parser"] = parser_diagnostics
     ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
     runner_diagnostics["ci_policy"] = ci_policy
-    Path("cursor_review_raw.txt").write_text(raw_output, encoding="utf-8")
+    markdown_redaction = redact_text(markdown)
+    findings_redaction = redact_text(findings_json)
+    stderr_redaction = redact_text(stderr)
+    raw_output_redaction = redact_text(raw_output)
+    runner_diagnostics["redaction"] = combine_results(
+        [
+            markdown_redaction,
+            findings_redaction,
+            stderr_redaction,
+            raw_output_redaction if settings.get("debug_artifacts") else redact_text(""),
+        ]
+    )
+    markdown = markdown_redaction.text
+    findings_json = findings_redaction.text
+    stderr = stderr_redaction.text
+    if settings.get("debug_artifacts"):
+        Path("cursor_review_raw.txt").write_text(raw_output_redaction.text, encoding="utf-8")
     rendered = render_comment(
         markdown,
         findings_json,

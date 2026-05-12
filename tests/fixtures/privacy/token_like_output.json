@@ -1,0 +1,12 @@
+{
+  "input": "Model output copied ghp_1234567890abcdefghijklmnopqrstuvwxyz and Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnopqrstuvwxyz1234567890 plus secret=cursor_live_secret_12345.",
+  "env": {
+    "CURSOR_API_KEY": "cursor_live_secret_12345"
+  },
+  "must_not_contain": [
+    "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+    "cursor_live_secret_12345"
+  ],
+  "placeholder": "[REDACTED]"
+}

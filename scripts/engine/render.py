@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
+from .redaction import combine_results, privacy_diagnostics, redact_text
 from .taxonomy import taxonomy_summary
 
 
@@ -71,6 +72,17 @@ Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
 
 def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: str, truncated: bool, parsed_ok: bool, meta: Dict[str, Any], settings: Dict[str, Any], runner_diagnostics: Optional[Dict[str, Any]] = None) -> str:
     runner_diagnostics = runner_diagnostics or {}
+    markdown_redaction = redact_text(markdown)
+    stderr_redaction = redact_text(stderr)
+    markdown = markdown_redaction.text
+    stderr = stderr_redaction.text
+    redaction_summary = combine_results(
+        [
+            markdown_redaction,
+            stderr_redaction,
+            runner_diagnostics.get("redaction") or redact_text(""),
+        ]
+    )
     budget = meta.get("budget") or {}
     reviewed_files = meta.get("reviewed_files")
     skipped_files = meta.get("skipped_files") or []
@@ -155,6 +167,15 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- CI high severity findings: `{ci_policy.get('high_severity_finding_count', 0)}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
+    privacy = privacy_diagnostics(settings, redaction_summary)
+    diagnostics.append(f"- Privacy redaction schema: `{privacy.get('schema_version')}`")
+    diagnostics.append(f"- Redaction status: `{privacy.get('redaction_status')}`")
+    diagnostics.append(f"- Redaction replacements: `{privacy.get('redacted_count')}`")
+    diagnostics.append(f"- Secret value replacements: `{privacy.get('secret_value_count')}`")
+    diagnostics.append(f"- Debug artifacts enabled: `{str(privacy.get('debug_artifacts_enabled', False)).lower()}`")
+    diagnostics.append(f"- Cursor data sent: `{privacy.get('cursor_data')}`")
+    diagnostics.append(f"- Actions log policy: `{privacy.get('actions_log_policy')}`")
+    diagnostics.append(f"- PR comment policy: `{privacy.get('pr_comment_policy')}`")
     repo_guidance = meta.get("repo_guidance") or {}
     guidance_diagnostics = repo_guidance.get("diagnostics") or {}
     if guidance_diagnostics:
@@ -199,7 +220,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
         warning = f"\n> Note: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
 
-    return f"""{HUMAN_REVIEW_NOTICE}
+    rendered = f"""{HUMAN_REVIEW_NOTICE}
 
 {markdown.strip()}
 {warning}
@@ -210,9 +231,11 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
 
 </details>
 """
+    return redact_text(rendered).text
 
 
 def set_output(name: str, value: str) -> None:
+    value = redact_text(value).text
     output_path = os.environ.get("GITHUB_OUTPUT")
     if not output_path:
         print(f"{name}={value}")
@@ -223,6 +246,7 @@ def set_output(name: str, value: str) -> None:
 
 
 def write_step_summary(summary: str) -> None:
+    summary = redact_text(summary).text
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as handle:

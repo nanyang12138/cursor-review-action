@@ -361,6 +361,7 @@ Important inputs:
 - `comment-mode`: `update`, `create`, or `off`.
 - `fail-on-error`: Fail the job when Cursor review fails. Default: `false`.
 - `fail-on-findings`: Preserved for compatibility but not enforced without a future explicit severity-threshold contract.
+- `debug-artifacts`: Write redacted live-run prompt/raw-output debug files. Default: `false`.
 
 ## Commands
 
@@ -418,6 +419,8 @@ use `--dry-run-output stored-output.txt`. See `docs/local-development.md`.
 - Treat PR comments and diff content as untrusted prompt input.
 - The action parses only allowlisted slash command arguments and passes remaining comment text to Cursor as prompt text only; it does not execute comment text as shell.
 - The action also enforces the same trusted author association policy before context construction and Cursor CLI execution.
+- Live runs do not write raw prompt or raw Cursor output files unless `debug-artifacts: true` is set.
+- PR comments, step summaries, and action outputs pass through token-like string redaction. See `docs/privacy-and-logging.md`.
 
 The example workflow restricts manual triggers to:
 
