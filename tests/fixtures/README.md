@@ -6,7 +6,7 @@ parsing, and rendered diagnostics.
 
 Each concrete fixture must declare capability IDs so product parity claims can be
 traced back to repeatable evidence in `docs/parity-scorecard.md`. The harness
-currently has 18 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
+currently has 19 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
 volume gate while the `v1` target remains 20 fixtures. The review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
@@ -31,6 +31,9 @@ volume gate while the `v1` target remains 20 fixtures. The review harness covers
 - `many_small_files_review`: many-small-files PR fixture that verifies max-file
   budget diagnostics, skipped-file transparency, and anchored findings across
   prioritized security/test/config context.
+- `missing_tests_review`: missing-test PR fixture that verifies a new selected
+  billing behavior branch can produce an actionable `test_gap` finding with
+  taxonomy, grounding, and quality-gate diagnostics.
 - `config_only_review`: configuration-only PR fixture that keeps `.cursor-review.yml`
   reviewable and verifies effective config diagnostics in rendered output.
 - `duplicate_findings`: same-run deduplication fixture that collapses duplicate

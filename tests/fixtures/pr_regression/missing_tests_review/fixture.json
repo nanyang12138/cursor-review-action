@@ -1,0 +1,78 @@
+{
+  "name": "missing_tests_review",
+  "capability_ids": [
+    "PROMPT-REVIEW-P0",
+    "FINDING-TAXONOMY-P0",
+    "FINDING-GROUNDING-P0",
+    "OUTPUT-QUALITY-GATE-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "tests,regression",
+    "max_findings": 3
+  },
+  "context": {
+    "diff_text": "diff --git a/src/billing/discounts.py b/src/billing/discounts.py\n@@ -12,6 +12,8 @@ def apply_discount(cart, user):\n     total = cart.subtotal\n+    if user.segment == \"enterprise\":\n+        return total * 0.7\n     if cart.coupon:\n         return total - cart.coupon.amount\n     return total\n",
+    "stat": " src/billing/discounts.py | 2 ++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/billing/discounts.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/billing/discounts.py",
+          "bytes": 206,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "118",
+        "title": "Add enterprise discount",
+        "body": "Adds a new enterprise discount path in billing.",
+        "base_ref": "main",
+        "head_ref": "feature/enterprise-discount",
+        "commit_messages": [
+          "Add enterprise discount path"
+        ],
+        "changed_files": [
+          "src/billing/discounts.py"
+        ],
+        "diff_stat": "src/billing/discounts.py | 2 ++"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>The enterprise discount path needs explicit regression coverage before this billing rule ships.</review_markdown>\n<findings_json>[{\"schema_version\":\"cursor-review-finding/v1\",\"category\":\"test_gap\",\"severity\":\"medium\",\"confidence\":\"high\",\"file\":\"src/billing/discounts.py\",\"line\":13,\"title\":\"Add regression coverage for the enterprise discount branch\",\"body\":\"The new enterprise-specific discount returns early before coupon handling, but no test change accompanies the billing rule. A regression could silently change discount precedence.\",\"suggestion\":\"Add tests that cover enterprise users with and without coupons so the intended precedence is locked down.\",\"evidence\":\"if user.segment == \\\"enterprise\\\":\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "Review focus: tests, regression.",
+      "\"changed_files\": [",
+      "src/billing/discounts.py"
+    ],
+    "markdown_contains": [
+      "enterprise discount path needs explicit regression coverage"
+    ],
+    "rendered_contains": [
+      "enterprise discount path needs explicit regression coverage",
+      "Files reviewed: `1`",
+      "Taxonomy normalized findings: `1`",
+      "Grounding anchored findings: `1`",
+      "Quality gate publishable findings: `1`"
+    ],
+    "findings_json_contains": [
+      "\"category\": \"test_gap\"",
+      "\"noise_control\": \"actionable_review\"",
+      "\"grounding_status\": \"anchored\"",
+      "\"grounding_reason\": \"new_changed_line\""
+    ]
+  }
+}
