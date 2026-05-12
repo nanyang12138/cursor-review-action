@@ -351,6 +351,7 @@ Important inputs:
 - `persistent-comment`: Update the previous comment for the same command. Default: `true`.
 - `comment-mode`: `update`, `create`, or `off`.
 - `fail-on-error`: Fail the job when Cursor review fails. Default: `false`.
+- `fail-on-findings`: Preserved for compatibility but not enforced without a future explicit severity-threshold contract.
 
 ## Commands
 
@@ -386,7 +387,7 @@ Unknown arguments are not used as configuration overrides. They remain ordinary 
 
 Cursor Review Action comments are advisory and non-blocking by default. A human reviewer decides whether to accept, dismiss, or follow up on findings.
 
-The action does not approve PRs, merge PRs, or fail CI because of findings by default. See `docs/human-review-workflow.md` for the author checklist and maintainer override guidance.
+The action does not approve PRs, merge PRs, or fail CI because of findings by default. See `docs/human-review-workflow.md` for the author checklist and maintainer override guidance, and `docs/ci-policy.md` for the `fail-on-error` / `fail-on-findings` status policy.
 
 ## Security Model
 

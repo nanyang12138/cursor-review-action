@@ -103,7 +103,7 @@ todos:
     status: completed
   - id: ci-policy
     content: 定义 fail-on-error/fail-on-findings 的 CI status policy，默认不因 findings 阻塞合并
-    status: pending
+    status: completed
   - id: local-dry-run
     content: 提供不需要 CURSOR_API_KEY 的本地 dry-run，用于验证 config/context/diff/prompt/parser/render
     status: pending

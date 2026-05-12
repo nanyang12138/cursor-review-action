@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, parser, prompts, render, runner, run_state, schemas, scope, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, parser, prompts, render, runner, run_state, schemas, scope, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -237,6 +237,51 @@ guidance_max_bytes: 1024
         self.assertEqual(settings["timeout_seconds"], 30)
         self.assertEqual(settings["scope_mode"], "files")
         self.assertEqual(settings["scope_files"], "src/*.py,tests/*.py")
+
+
+class CIPolicyTests(unittest.TestCase):
+    def test_default_policy_does_not_fail_on_high_findings(self) -> None:
+        decision = ci_policy.evaluate_ci_policy(
+            0,
+            json.dumps(
+                [
+                    {
+                        "schema_version": schemas.FINDING_SCHEMA_VERSION,
+                        "severity": "critical",
+                        "title": "Secret leak",
+                    }
+                ]
+            ),
+            {"fail_on_error": False, "fail_on_findings": False},
+        )
+
+        self.assertEqual(decision["schema_version"], ci_policy.CI_POLICY_SCHEMA_VERSION)
+        self.assertEqual(decision["workflow_exit_code"], 0)
+        self.assertEqual(decision["finding_count"], 1)
+        self.assertEqual(decision["high_severity_finding_count"], 1)
+        self.assertEqual(decision["highest_severity"], "critical")
+        self.assertEqual(decision["findings_gate_status"], "disabled")
+        self.assertFalse(decision["findings_gate_enforced"])
+
+    def test_fail_on_error_controls_cursor_failures(self) -> None:
+        non_blocking = ci_policy.evaluate_ci_policy(2, "[]", {"fail_on_error": False})
+        blocking = ci_policy.evaluate_ci_policy(2, "[]", {"fail_on_error": True})
+
+        self.assertEqual(non_blocking["workflow_exit_code"], 0)
+        self.assertEqual(non_blocking["reason"], "cursor_error_non_blocking")
+        self.assertEqual(blocking["workflow_exit_code"], 2)
+        self.assertEqual(blocking["reason"], "cursor_error_failed")
+
+    def test_fail_on_findings_is_diagnosed_but_not_enforced_without_threshold(self) -> None:
+        decision = ci_policy.evaluate_ci_policy(
+            0,
+            json.dumps([{"schema_version": schemas.FINDING_SCHEMA_VERSION, "severity": "high"}]),
+            {"fail_on_error": False, "fail_on_findings": True},
+        )
+
+        self.assertEqual(decision["workflow_exit_code"], 0)
+        self.assertEqual(decision["findings_gate_status"], "reserved_no_threshold")
+        self.assertFalse(decision["findings_gate_enforced"])
 
 
 class ContextBuilderTests(unittest.TestCase):
@@ -844,6 +889,32 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Review policy: `advisory_non_blocking`", rendered)
         self.assertIn("Human decision required: `true`", rendered)
 
+    def test_render_comment_reports_ci_policy_diagnostics(self) -> None:
+        rendered = render.render_comment(
+            "One issue.",
+            json.dumps([{"schema_version": schemas.FINDING_SCHEMA_VERSION, "severity": "high"}]),
+            0,
+            "",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+            {
+                "ci_policy": ci_policy.evaluate_ci_policy(
+                    0,
+                    json.dumps([{"schema_version": schemas.FINDING_SCHEMA_VERSION, "severity": "high"}]),
+                    {"fail_on_error": False, "fail_on_findings": True},
+                )
+            },
+        )
+
+        self.assertIn("CI policy schema: `ci-policy/v1`", rendered)
+        self.assertIn("CI default: `advisory_non_blocking`", rendered)
+        self.assertIn("CI fail on findings: `true`", rendered)
+        self.assertIn("CI findings gate status: `reserved_no_threshold`", rendered)
+        self.assertIn("CI workflow exit code: `0`", rendered)
+        self.assertIn("CI high severity findings: `1`", rendered)
+
     def test_render_comment_reports_schema_compatibility_diagnostics(self) -> None:
         rendered = render.render_comment(
             "No issues.",
@@ -1264,6 +1335,7 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("resolved_command", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             self.assertIn("comment_marker", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             self.assertIn("run_metadata_json", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
+            self.assertIn("ci_policy_json", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             prompt = run_cursor.call_args.args[0]
             self.assertIn("Maximum findings: 2.", prompt)
             self.assertIn("Review focus: security, tests.", prompt)
