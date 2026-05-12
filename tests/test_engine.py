@@ -649,6 +649,32 @@ class FixtureRegressionTests(unittest.TestCase):
                 self.assertIn(f"| {capability_id} |", scorecard)
 
 
+class ComparisonProtocolTests(unittest.TestCase):
+    def test_comparison_protocol_documents_clean_room_required_fields(self) -> None:
+        reports_dir = ROOT / "docs" / "parity-reports"
+        readme = (reports_dir / "README.md").read_text(encoding="utf-8")
+        template = (reports_dir / "template.md").read_text(encoding="utf-8")
+
+        self.assertIn("Do not copy PR-Agent source code", readme)
+        self.assertIn("Gap decision and owner document", readme)
+        self.assertIn("Decision: backlog | deferred | non-goal", template)
+        self.assertIn("Cursor-native evidence", template)
+
+    def test_initial_comparison_gap_log_classifies_every_gap(self) -> None:
+        report = (ROOT / "docs" / "parity-reports" / "2026-05-12-initial-gap-log.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertGreaterEqual(report.count("| sample-"), 5)
+        gap_sections = [section for section in report.split("\n### ") if section.startswith("GAP-")]
+        self.assertGreaterEqual(len(gap_sections), 5)
+        for section in gap_sections:
+            with self.subTest(gap=section.splitlines()[0]):
+                self.assertRegex(section, r"Decision: (backlog|deferred|non-goal)")
+                self.assertIn("Capability/status target:", section)
+                self.assertIn("Release impact:", section)
+
+
 class RunnerContractTests(unittest.TestCase):
     def test_run_cursor_result_records_success_contract(self) -> None:
         completed = mock.Mock(returncode=0, stdout="ok", stderr="")
