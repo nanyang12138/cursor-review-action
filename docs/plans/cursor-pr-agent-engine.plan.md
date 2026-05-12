@@ -100,7 +100,7 @@ todos:
     status: completed
   - id: human-review-workflow
     content: 明确 AI review 默认 advisory/non-blocking，不自动 approve，不默认阻塞 merge，并记录人工 override 方式
-    status: pending
+    status: completed
   - id: ci-policy
     content: 定义 fail-on-error/fail-on-findings 的 CI status policy，默认不因 findings 阻塞合并
     status: pending

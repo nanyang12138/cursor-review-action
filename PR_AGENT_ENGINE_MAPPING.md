@@ -1301,7 +1301,8 @@ PR-Agent behavior to learn from:
 
 Current action:
 
-- Produces review comments but does not define how humans should consume, acknowledge, or override them.
+- Produces review comments with an advisory/non-blocking policy notice.
+- Defines author acknowledgement and maintainer override guidance in `docs/human-review-workflow.md`.
 
 Cursor-native implementation:
 

@@ -4,6 +4,13 @@ from typing import Any, Dict, List, Optional
 from .taxonomy import taxonomy_summary
 
 
+HUMAN_REVIEW_NOTICE = (
+    "> Cursor Review is advisory and non-blocking. A human reviewer decides whether "
+    "to accept, dismiss, or follow up on findings; this action does not approve, "
+    "merge, or block PRs by default."
+)
+
+
 def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
     run_state = settings.get("run_state") or {}
     if not run_state:
@@ -57,6 +64,8 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
     reviewed_count = len(reviewed_files) if reviewed_files is not None else len(meta.get("files", []))
     diagnostics = [
         f"- Command: `{settings.get('resolved_command')}`",
+        "- Review policy: `advisory_non_blocking`",
+        "- Human decision required: `true`",
         f"- Prompt template version: `{settings.get('prompt_template_version', 'unknown')}`",
         f"- Model: `{settings.get('model')}`",
         f"- Runner: `{runner_diagnostics.get('runner', 'cursor_cli')}`",
@@ -163,7 +172,9 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
         warning = f"\n> Note: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
 
-    return f"""{markdown.strip()}
+    return f"""{HUMAN_REVIEW_NOTICE}
+
+{markdown.strip()}
 {warning}
 <details>
 <summary>Cursor Review Diagnostics</summary>

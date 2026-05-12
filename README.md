@@ -21,6 +21,7 @@ This action is intentionally smaller:
 - It lets reviewers add extra prompt instructions directly in a PR comment.
 - It is easy to copy into personal repos, prototypes, and small team repos.
 - It checks trigger trust before contacting Cursor, so untrusted slash commands and fork PRs without secrets are skipped safely.
+- It is advisory by default: humans decide whether findings should block, and the action does not approve or merge PRs.
 
 ## What It Can Do
 
@@ -380,6 +381,12 @@ Supported arguments:
 - `--scope`: `full` or `files`; `full` forces the default full selected PR diff.
 
 Unknown arguments are not used as configuration overrides. They remain ordinary prompt text and are never passed to a shell.
+
+## Human Review Workflow
+
+Cursor Review Action comments are advisory and non-blocking by default. A human reviewer decides whether to accept, dismiss, or follow up on findings.
+
+The action does not approve PRs, merge PRs, or fail CI because of findings by default. See `docs/human-review-workflow.md` for the author checklist and maintainer override guidance.
 
 ## Security Model
 
