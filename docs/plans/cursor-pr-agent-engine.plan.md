@@ -133,7 +133,7 @@ todos:
     status: pending
   - id: finding-grounding
     content: 建立 selected-diff line index，验证 parsed findings 的 file/line/evidence anchor，并降级 invalid anchors
-    status: pending
+    status: completed
   - id: finding-dedup
     content: 对同轮 findings 做 normalization、fingerprint、dedup、severity/confidence/grounding 排序，再应用 max_findings 或 CI gating
     status: pending

@@ -1,0 +1,73 @@
+{
+  "name": "invalid_finding_anchor",
+  "capability_ids": [
+    "DIFF-INDEX-P0",
+    "FINDING-GROUNDING-P0",
+    "PARSER-FALLBACK-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "correctness",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/src/app.py b/src/app.py\n@@ -4,3 +4,4 @@ def handle(value):\n     normalized = value.strip()\n+    return normalized.lower()\n",
+    "stat": " src/app.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/app.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/app.py",
+          "bytes": 132,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [
+        {
+          "path": "src/skipped.py",
+          "reason": "max_files"
+        }
+      ],
+      "pull_request_context": {
+        "pr_number": "107",
+        "title": "Normalize input",
+        "body": "Normalizes input before later use.",
+        "base_ref": "main",
+        "head_ref": "feature/normalize-input",
+        "commit_messages": [
+          "Normalize input"
+        ],
+        "changed_files": [
+          "src/app.py",
+          "src/skipped.py"
+        ],
+        "diff_stat": "src/app.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>One precise finding and one skipped-file claim were returned.</review_markdown>\n<findings_json>[{\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"src/app.py\",\"line\":5,\"title\":\"Validate normalized input\",\"body\":\"The normalized input may need validation before use.\",\"suggestion\":\"Validate the normalized value before returning it.\",\"evidence\":\"return normalized.lower()\"},{\"severity\":\"critical\",\"confidence\":\"high\",\"file\":\"src/skipped.py\",\"line\":1,\"title\":\"Skipped file claim\",\"body\":\"This references a file outside the selected diff.\",\"suggestion\":\"Review the skipped file separately.\",\"evidence\":\"not in selected diff\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 2,
+    "rendered_contains": [
+      "Grounding anchored findings: `1`",
+      "Invalid anchor count: `1`",
+      "Skipped-file finding count: `1`"
+    ],
+    "findings_json_contains": [
+      "\"grounding_status\": \"anchored\"",
+      "\"grounding_status\": \"invalid\"",
+      "\"suppression_reason\": \"invalid_anchor\"",
+      "\"confidence\": \"low\""
+    ]
+  }
+}

@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, fixtures, grounding, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -603,6 +603,96 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertEqual(meta["reviewed_files"][0]["status"], "partial")
         self.assertEqual(meta["skipped_files"], [{"path": "a.py", "reason": "max_hunks_partial"}])
         self.assertEqual(meta["truncation_reasons"], ["max_hunks"])
+
+
+class FindingGroundingTests(unittest.TestCase):
+    def test_diff_index_records_new_and_old_changed_lines(self) -> None:
+        diff_text = """diff --git a/app/auth.py b/app/auth.py
+--- a/app/auth.py
++++ b/app/auth.py
+@@ -10,3 +10,4 @@ def login(request):
+     user = authenticate(request)
+-    session["is_admin"] = False
++    session["is_admin"] = request.args.get("admin") == "1"
+     return redirect("/")
+"""
+
+        index = diff_index.build_diff_index(diff_text)
+        entry = index["files"]["app/auth.py"]
+
+        self.assertEqual(index["schema_version"], diff_index.DIFF_INDEX_SCHEMA_VERSION)
+        self.assertEqual(entry["new_changed_lines"], [11])
+        self.assertEqual(entry["old_changed_lines"], [11])
+        self.assertEqual(entry["hunks"][0]["header"], "@@ -10,3 +10,4 @@ def login(request):")
+
+    def test_grounding_classifies_anchored_file_only_invalid_and_unanchored_findings(self) -> None:
+        diff_text = """diff --git a/app/auth.py b/app/auth.py
+@@ -10,3 +10,4 @@ def login(request):
+     user = authenticate(request)
++    session["is_admin"] = request.args.get("admin") == "1"
+     return redirect("/")
+"""
+        index = diff_index.build_diff_index(diff_text, [{"path": "skipped.py", "reason": "max_files"}])
+        findings = [
+            {"file": "app/auth.py", "line": 11, "severity": "high", "confidence": "high", "title": "valid"},
+            {"file": "app/auth.py", "line": 10, "severity": "medium", "confidence": "high", "title": "context"},
+            {"file": "skipped.py", "line": 1, "severity": "critical", "confidence": "high", "title": "skipped"},
+            {"severity": "high", "confidence": "high", "title": "missing file"},
+        ]
+
+        result = grounding.ground_findings_json(json.dumps(findings), index, "review")
+        grounded = json.loads(result.findings_json)
+
+        self.assertEqual([item["grounding_status"] for item in grounded], ["anchored", "file_only", "invalid", "unanchored"])
+        self.assertEqual(grounded[0]["anchor"]["line"], 11)
+        self.assertEqual(grounded[1]["review_section"], "needs_human_verification")
+        self.assertTrue(grounded[2]["suppressed"])
+        self.assertEqual(grounded[2]["confidence"], "low")
+        self.assertEqual(result.diagnostics["anchored_count"], 1)
+        self.assertEqual(result.diagnostics["file_only_count"], 1)
+        self.assertEqual(result.diagnostics["invalid_anchor_count"], 1)
+        self.assertEqual(result.diagnostics["skipped_file_finding_count"], 1)
+
+    def test_grounding_supports_deleted_line_evidence_without_new_line_anchor(self) -> None:
+        diff_text = """diff --git a/src/flags.py b/src/flags.py
+@@ -20,3 +20,2 @@ FLAGS = {
+-    "unsafe": True,
+     "safe": True,
+}
+"""
+        index = diff_index.build_diff_index(diff_text)
+        findings = [
+            {
+                "file": "src/flags.py",
+                "line": None,
+                "old_line": 20,
+                "line_side": "old",
+                "severity": "medium",
+                "confidence": "high",
+                "title": "Deleted unsafe flag",
+            }
+        ]
+
+        result = grounding.ground_findings_json(json.dumps(findings), index, "review")
+        grounded = json.loads(result.findings_json)
+
+        self.assertEqual(grounded[0]["grounding_status"], "anchored")
+        self.assertEqual(grounded[0]["anchor"]["line_side"], "old")
+        self.assertEqual(grounded[0]["anchor"]["old_line"], 20)
+
+    def test_ci_policy_excludes_invalid_grounded_findings_from_gating_counts(self) -> None:
+        findings = [
+            {"severity": "critical", "grounding_status": "invalid", "suppressed": True},
+            {"severity": "high", "grounding_status": "file_only"},
+            {"severity": "high", "grounding_status": "anchored"},
+        ]
+
+        decision = ci_policy.evaluate_ci_policy(0, json.dumps(findings), {"fail_on_findings": True})
+
+        self.assertEqual(decision["finding_count"], 3)
+        self.assertEqual(decision["gating_eligible_finding_count"], 1)
+        self.assertEqual(decision["high_severity_finding_count"], 1)
+        self.assertEqual(decision["highest_severity"], "high")
 
 
 class PromptParserRenderTests(unittest.TestCase):

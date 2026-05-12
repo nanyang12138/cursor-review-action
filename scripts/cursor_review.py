@@ -9,6 +9,7 @@ from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
+from engine.grounding import ground_findings_json
 from engine.help import render_help
 from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
 from engine.parser import build_repair_prompt, parse_agent_output_result
@@ -175,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
 
     runner_diagnostics["cursor_calls_attempted"] = cursor_calls_attempted
     runner_diagnostics["retry_count"] = parser_diagnostics.get("repair_retry_count", 0)
+    grounding_result = ground_findings_json(findings_json, context.meta.get("diff_index") or {}, command)
+    findings_json = grounding_result.findings_json
+    parser_diagnostics["grounding"] = grounding_result.diagnostics
     runner_diagnostics["parser"] = parser_diagnostics
     ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
     runner_diagnostics["ci_policy"] = ci_policy

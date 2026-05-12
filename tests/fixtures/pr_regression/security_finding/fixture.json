@@ -48,7 +48,7 @@
       }
     }
   },
-  "agent_output": "<review_markdown>Found a security issue in `app/auth.py`.</review_markdown>\n<findings_json>[{\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"app/auth.py\",\"line\":12,\"title\":\"Do not trust query parameters for admin state\",\"body\":\"A caller can set admin=1 and receive an admin session flag.\",\"suggestion\":\"Derive admin status from authenticated user authorization data only.\",\"evidence\":\"session[\\\"is_admin\\\"] = request.args.get(\\\"admin\\\") == \\\"1\\\"\"}]</findings_json>",
+  "agent_output": "<review_markdown>Found a security issue in `app/auth.py`.</review_markdown>\n<findings_json>[{\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"app/auth.py\",\"line\":11,\"title\":\"Do not trust query parameters for admin state\",\"body\":\"A caller can set admin=1 and receive an admin session flag.\",\"suggestion\":\"Derive admin status from authenticated user authorization data only.\",\"evidence\":\"session[\\\"is_admin\\\"] = request.args.get(\\\"admin\\\") == \\\"1\\\"\"}]</findings_json>",
   "expected": {
     "parsed_ok": true,
     "findings_type": "array",
@@ -65,12 +65,14 @@
       "Found a security issue in `app/auth.py`.",
       "Files reviewed: `1`",
       "Findings JSON parsed: `true`",
-      "Taxonomy normalized findings: `1`"
+      "Taxonomy normalized findings: `1`",
+      "Grounding anchored findings: `1`"
     ],
     "findings_json_contains": [
       "\"schema_version\": \"cursor-review-finding/v1\"",
       "\"category\": \"security\"",
-      "\"noise_control\": \"actionable_review\""
+      "\"noise_control\": \"actionable_review\"",
+      "\"grounding_status\": \"anchored\""
     ]
   }
 }

@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from .budget import normalized_budget_settings
 from .ci_policy import evaluate_ci_policy
 from .context import build_review_context
+from .grounding import ground_findings_json
 from .parser import parse_agent_output_result
 from .prompts import build_prompt, prompt_template_version
 from .render import render_comment
@@ -96,14 +97,17 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
     )
     output = load_dry_run_agent_output(command, output_path)
     parse_result = parse_agent_output_result(output["raw_output"], command)
+    grounding_result = ground_findings_json(parse_result.findings_json, context.meta.get("diff_index") or {}, command)
+    findings_json = grounding_result.findings_json
     parser_diagnostics = dict(parse_result.diagnostics)
+    parser_diagnostics["grounding"] = grounding_result.diagnostics
     parser_diagnostics["repair_retry_count"] = 0
     parser_diagnostics["dry_run_output_source"] = output["source"]
     if output["path"]:
         parser_diagnostics["dry_run_output_path"] = output["path"]
 
     budgets = normalized_budget_settings(settings)
-    ci_policy = evaluate_ci_policy(0, parse_result.findings_json, settings)
+    ci_policy = evaluate_ci_policy(0, findings_json, settings)
     runner_diagnostics = {
         "runner": "local_dry_run",
         "failure_kind": "none",
@@ -122,7 +126,7 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
     }
     rendered = render_comment(
         parse_result.markdown,
-        parse_result.findings_json,
+        findings_json,
         0,
         "",
         context.truncated,
@@ -145,7 +149,7 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
     }
     return LocalDryRunResult(
         rendered=rendered,
-        findings_json=parse_result.findings_json,
+        findings_json=findings_json,
         prompt=prompt,
         raw_output=output["raw_output"],
         parsed_ok=parse_result.parsed_ok,

@@ -1,9 +1,12 @@
+import copy
 import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from .config import DEFAULTS
+from .diff_index import build_diff_index
+from .grounding import ground_findings_json
 from .parser import parse_agent_output_result
 from .prompts import build_prompt
 from .render import render_comment
@@ -41,40 +44,46 @@ def run_fixture(fixture: Dict[str, Any]) -> FixtureResult:
     command = fixture.get("command", "review")
     context = fixture.get("context") or {}
     settings = _settings_for_fixture(fixture)
+    meta = copy.deepcopy(context.get("meta") or {})
+    meta.setdefault("diff_index", build_diff_index(context.get("diff_text", ""), meta.get("skipped_files") or []))
     prompt = build_prompt(
         command,
         fixture.get("user_prompt", ""),
         context.get("diff_text", ""),
         context.get("stat", ""),
         bool(context.get("truncated", False)),
-        context.get("meta") or {},
+        meta,
         settings,
     )
     parse_result = parse_agent_output_result(fixture.get("agent_output", ""), command)
+    grounding_result = ground_findings_json(parse_result.findings_json, meta.get("diff_index") or {}, command)
+    findings_json = grounding_result.findings_json
     runner_diagnostics = dict(fixture.get("runner_diagnostics") or {})
     if parse_result.diagnostics:
-        runner_diagnostics.setdefault("parser", parse_result.diagnostics)
+        parser_diagnostics = dict(parse_result.diagnostics)
+        parser_diagnostics["grounding"] = grounding_result.diagnostics
+        runner_diagnostics.setdefault("parser", parser_diagnostics)
     rendered = render_comment(
         parse_result.markdown,
-        parse_result.findings_json,
+        findings_json,
         int(fixture.get("exit_code", 0)),
         fixture.get("stderr", ""),
         bool(context.get("truncated", False)),
         parse_result.parsed_ok,
-        context.get("meta") or {},
+        meta,
         settings,
         runner_diagnostics,
     )
     return FixtureResult(
         prompt=prompt,
         markdown=parse_result.markdown,
-        findings_json=parse_result.findings_json,
+        findings_json=findings_json,
         parsed_ok=parse_result.parsed_ok,
         rendered=rendered,
         diagnostics={
             "fixture_name": fixture.get("name", ""),
             "capability_ids": fixture.get("capability_ids") or [],
-            "parser": parse_result.diagnostics,
+            "parser": runner_diagnostics.get("parser", parse_result.diagnostics),
         },
     )
 

@@ -35,12 +35,25 @@ def _highest_severity(findings: List[Dict[str, Any]]) -> str:
     return highest
 
 
+def _gating_eligible_findings(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    eligible = []
+    for finding in findings:
+        grounding_status = str(finding.get("grounding_status") or "").strip().lower()
+        if grounding_status in {"invalid", "unanchored", "file_only"}:
+            continue
+        if finding.get("suppressed"):
+            continue
+        eligible.append(finding)
+    return eligible
+
+
 def evaluate_ci_policy(exit_code: int, findings_json: str, settings: Dict[str, Any]) -> Dict[str, Any]:
     """Evaluate workflow status policy without letting model opinion block by default."""
     findings = _load_findings(findings_json)
+    gating_findings = _gating_eligible_findings(findings)
     high_severity_count = sum(
         1
-        for finding in findings
+        for finding in gating_findings
         if str(finding.get("severity") or "").strip().lower() in HIGH_SEVERITIES
     )
     fail_on_error = bool(settings.get("fail_on_error"))
@@ -71,8 +84,9 @@ def evaluate_ci_policy(exit_code: int, findings_json: str, settings: Dict[str, A
         "findings_gate_status": findings_gate_status,
         "findings_gate_enforced": False,
         "finding_count": len(findings),
+        "gating_eligible_finding_count": len(gating_findings),
         "high_severity_finding_count": high_severity_count,
-        "highest_severity": _highest_severity(findings),
+        "highest_severity": _highest_severity(gating_findings),
         "cursor_exit_code": exit_code,
         "workflow_exit_code": workflow_exit_code,
         "reason": reason,

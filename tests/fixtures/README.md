@@ -16,6 +16,8 @@ review harness covers:
 - `large_partial_review`: partial review diagnostics for budget-limited diffs.
 - `ask_question`: command-specific ask schema and answer rendering.
 - `describe_summary`: command-specific describe schema and comment-only summary.
+- `invalid_finding_anchor`: selected-diff grounding fixture that keeps an
+  anchored finding while downgrading a skipped-file finding.
 
 The comparison protocol lives in `docs/parity-reports/` and uses these
 repository-owned fixtures as initial samples. The fixtures intentionally do not

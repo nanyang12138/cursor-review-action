@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple
 
 from .budget import normalized_budget_settings
 from .config import split_csv
+from .diff_index import build_diff_index
 from .runner import run_command
 from .scope import apply_review_scope
 
@@ -182,6 +183,7 @@ def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]
     truncation_reasons = ["max_files"] if file_budget_skipped else []
 
     if not files:
+        diff_index = build_diff_index("", skipped_files)
         return "", "No changed files selected.", False, {
             "base": base,
             "head": head,
@@ -194,6 +196,7 @@ def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]
             "filter_mode": filter_mode,
             "budget": budgets,
             "truncation_reasons": truncation_reasons,
+            "diff_index": diff_index,
         }
 
     stat_cmd = ["git", "diff", "--stat", range_label, "--"] + files if base else ["git", "show", "--stat", "--format=", "HEAD", "--"] + files
@@ -205,6 +208,7 @@ def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]
     truncated = truncated or bool(file_budget_skipped)
     if truncated and "max_diff_bytes" in truncation_reasons and "[Diff truncated by cursor-review-action due to max_diff_bytes]" not in diff_text:
         diff_text += "\n\n[Diff truncated by cursor-review-action due to max_diff_bytes]\n"
+    diff_index = build_diff_index(diff_text, skipped_files)
 
     meta = {
         "base": base,
@@ -221,5 +225,6 @@ def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]
         "hunks": hunk_count,
         "budget": budgets,
         "truncation_reasons": truncation_reasons,
+        "diff_index": diff_index,
     }
     return diff_text, stat, truncated, meta

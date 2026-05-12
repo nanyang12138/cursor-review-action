@@ -385,6 +385,20 @@ Validation checklist:
 - Large PR skipped file cannot produce an anchored finding unless the file was selected.
 - CI gating never treats invalid anchors as blocking findings.
 
+Implementation evidence:
+
+- `scripts/engine/diff_index.py` builds a `diff-index/v1` selected-diff line index
+  with new-side additions, old-side deletions, hunk headers, aliases, and skipped
+  file paths.
+- `scripts/engine/grounding.py` annotates parsed review findings with
+  `anchored`, `file_only`, `unanchored`, or `invalid` grounding status before
+  rendering, local dry-run output, fixture validation, or CI policy evaluation.
+- `tests/fixtures/pr_regression/security_finding` covers an anchored changed-line
+  finding; `tests/fixtures/pr_regression/invalid_finding_anchor` covers skipped
+  file invalid-anchor downgrade.
+- `docs/finding-grounding.md` documents selected-diff indexing, deleted-line
+  evidence, invalid-anchor downgrade, and diagnostics behavior.
+
 ### Publishing Strategy
 
 PR-Agent behavior to learn from:

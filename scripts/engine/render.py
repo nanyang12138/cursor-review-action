@@ -126,6 +126,16 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
             diagnostics.append(f"- Output schema command match: `{str(schema_diagnostics.get('command_match', True)).lower()}`")
         for label, value in taxonomy_summary(parser_diagnostics.get("taxonomy") or {}):
             diagnostics.append(f"- {label}: `{str(value).lower() if isinstance(value, bool) else value}`")
+        grounding = parser_diagnostics.get("grounding") or {}
+        if grounding:
+            diagnostics.append(f"- Grounding schema: `{grounding.get('schema_version', 'unknown')}`")
+            diagnostics.append(f"- Grounding applied: `{str(grounding.get('applied', False)).lower()}`")
+            diagnostics.append(f"- Diff index schema: `{grounding.get('diff_index_schema_version', 'unknown')}`")
+            diagnostics.append(f"- Grounding anchored findings: `{grounding.get('anchored_count', 0)}`")
+            diagnostics.append(f"- Grounding file-only findings: `{grounding.get('file_only_count', 0)}`")
+            diagnostics.append(f"- Grounding unanchored findings: `{grounding.get('unanchored_count', 0)}`")
+            diagnostics.append(f"- Invalid anchor count: `{grounding.get('invalid_anchor_count', 0)}`")
+            diagnostics.append(f"- Skipped-file finding count: `{grounding.get('skipped_file_finding_count', 0)}`")
         if parser_diagnostics.get("repair_skipped_reason"):
             diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
         if "repair_succeeded" in parser_diagnostics:
@@ -164,6 +174,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- CI findings gate status: `{ci_policy.get('findings_gate_status', 'unknown')}`")
         diagnostics.append(f"- CI workflow exit code: `{ci_policy.get('workflow_exit_code', 0)}`")
         diagnostics.append(f"- CI policy reason: `{ci_policy.get('reason', 'unknown')}`")
+        diagnostics.append(f"- CI gating eligible findings: `{ci_policy.get('gating_eligible_finding_count', ci_policy.get('finding_count', 0))}`")
         diagnostics.append(f"- CI high severity findings: `{ci_policy.get('high_severity_finding_count', 0)}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
