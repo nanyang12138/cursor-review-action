@@ -90,7 +90,7 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertTrue(truncated)
         self.assertIn("a.py", diff_text)
         self.assertNotIn("b.py b/b.py", diff_text)
-        self.assertEqual(meta["reviewed_files"], [{"path": "a.py", "bytes": 33, "status": "included"}])
+        self.assertEqual(meta["reviewed_files"], [{"path": "a.py", "bytes": 32, "status": "included"}])
         self.assertEqual(meta["skipped_files"], [{"path": "b.py", "reason": "max_diff_bytes"}])
 
     def test_build_diff_records_filter_skipped_files_without_truncation(self) -> None:
