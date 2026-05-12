@@ -1,5 +1,7 @@
 # Human Evaluation
 
+Rubric: ACCEPTANCE-RUBRIC-P1
+
 Capability IDs: PROMPT-REVIEW-P0, FINDING-TAXONOMY-P0, FINDING-GROUNDING-P0, OUTPUT-QUALITY-GATE-P0, FIXTURE-HARNESS-P0
 
 - real_issue_found: yes; the fixture checks that an early return in a discount branch is treated as a correctness bug.
