@@ -32,6 +32,7 @@ DEFAULTS: Dict[str, Any] = {
     "commit_messages": "",
     "include_patterns": "",
     "exclude_patterns": "",
+    "skip_generated_files": True,
     "scope_mode": "full",
     "scope_files": "",
     "guidance_enabled": True,
@@ -67,7 +68,7 @@ INT_SETTINGS: Dict[str, Tuple[int, int]] = {
     "guidance_max_lines": (DEFAULTS["guidance_max_lines"], 0),
 }
 
-BOOL_SETTINGS = {"guidance_enabled", "debug_artifacts", "fail_on_error", "fail_on_findings"}
+BOOL_SETTINGS = {"guidance_enabled", "debug_artifacts", "fail_on_error", "fail_on_findings", "skip_generated_files"}
 SUPPORTED_FILTER_MODES = {"added", "diff_context", "file"}
 SAFE_DIAGNOSTIC_VALUE_RE = re.compile(r"^[A-Za-z0-9 ._/@:+,*?=|-]{0,80}$")
 
@@ -343,6 +344,7 @@ def load_settings() -> Dict[str, Any]:
         "filter_mode": env("INPUT_FILTER_MODE", DEFAULTS["filter_mode"]),
         "include_patterns": env("INPUT_INCLUDE_PATTERNS", ""),
         "exclude_patterns": env("INPUT_EXCLUDE_PATTERNS", ""),
+        "skip_generated_files": DEFAULTS["skip_generated_files"],
         "scope_mode": env("INPUT_SCOPE_MODE", DEFAULTS["scope_mode"]),
         "scope_files": env("INPUT_SCOPE_FILES", DEFAULTS["scope_files"]),
         "debug_artifacts": env("INPUT_DEBUG_ARTIFACTS", "false"),

@@ -651,6 +651,33 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertEqual([item["path"] for item in meta["reviewed_files"]], ["src/a.py"])
         self.assertEqual(meta["skipped_files"], [{"path": "dist/b.js", "reason": "excluded"}])
 
+    def test_build_diff_skips_generated_and_lockfiles_by_default(self) -> None:
+        def fake_file_diff(file_name: str, *_args: object) -> str:
+            return f"diff --git a/{file_name} b/{file_name}\n+small\n"
+
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(
+                diff_selector,
+                "changed_files",
+                return_value=["src/app.py", "package-lock.json", "dist/app.min.js"],
+            ):
+                with mock.patch.object(diff_selector, "_file_diff", side_effect=fake_file_diff):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        diff_text, _stat, truncated, meta = diff_selector.build_diff({"max_diff_bytes": 120000})
+
+        self.assertFalse(truncated)
+        self.assertIn("src/app.py", diff_text)
+        self.assertNotIn("package-lock.json", diff_text)
+        self.assertNotIn("dist/app.min.js", diff_text)
+        self.assertEqual(meta["files"], ["src/app.py"])
+        self.assertEqual(
+            meta["skipped_files"],
+            [
+                {"path": "package-lock.json", "reason": "generated_or_lockfile"},
+                {"path": "dist/app.min.js", "reason": "generated_or_lockfile"},
+            ],
+        )
+
     def test_build_diff_applies_command_file_scope_before_budget(self) -> None:
         def fake_file_diff(file_name: str, *_args: object) -> str:
             return f"diff --git a/{file_name} b/{file_name}\n+small\n"

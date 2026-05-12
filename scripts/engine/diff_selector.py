@@ -2,10 +2,29 @@ import fnmatch
 from typing import Any, Dict, List, Tuple
 
 from .budget import normalized_budget_settings
-from .config import split_csv
+from .config import split_csv, to_bool
 from .diff_index import build_diff_index
 from .runner import run_command
 from .scope import apply_review_scope
+
+
+GENERATED_OR_LOCKFILE_PATTERNS = (
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "Pipfile.lock",
+    "Cargo.lock",
+    "composer.lock",
+    "Gemfile.lock",
+    "go.sum",
+    "*.min.js",
+    "*.min.css",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+)
 
 
 def diff_range(settings: Dict[str, Any]) -> Tuple[str, str, str]:
@@ -30,9 +49,14 @@ def changed_files(base: str, head: str) -> List[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def _is_generated_or_lockfile(file_name: str) -> bool:
+    return any(fnmatch.fnmatch(file_name, pattern) for pattern in GENERATED_OR_LOCKFILE_PATTERNS)
+
+
 def classify_files(files: List[str], settings: Dict[str, Any]) -> Tuple[List[str], List[Dict[str, str]]]:
     include_patterns = split_csv(settings.get("include_patterns"))
     exclude_patterns = split_csv(settings.get("exclude_patterns"))
+    skip_generated_files = to_bool(settings.get("skip_generated_files", True))
 
     selected = []
     skipped = []
@@ -41,12 +65,15 @@ def classify_files(files: List[str], settings: Dict[str, Any]) -> Tuple[List[str
         if include_patterns:
             include_ok = any(fnmatch.fnmatch(file_name, pattern) for pattern in include_patterns)
         exclude_hit = any(fnmatch.fnmatch(file_name, pattern) for pattern in exclude_patterns)
-        if include_ok and not exclude_hit:
+        generated_hit = skip_generated_files and _is_generated_or_lockfile(file_name)
+        if include_ok and not exclude_hit and not generated_hit:
             selected.append(file_name)
         elif not include_ok:
             skipped.append({"path": file_name, "reason": "not_included"})
-        else:
+        elif exclude_hit:
             skipped.append({"path": file_name, "reason": "excluded"})
+        else:
+            skipped.append({"path": file_name, "reason": "generated_or_lockfile"})
     return selected, skipped
 
 

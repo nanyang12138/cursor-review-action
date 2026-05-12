@@ -260,6 +260,7 @@ enabled_commands:
   - ask
   - improve
   - describe
+skip_generated_files: true
 include_patterns: []
 exclude_patterns:
   - "*.lock"
@@ -276,6 +277,9 @@ slash command arguments > PR comment prompt > .cursor-review.yml > workflow inpu
 Unknown `.cursor-review.yml` keys are ignored with diagnostics. Invalid numeric,
 boolean, or `filter_mode` values fall back to safe defaults before Cursor is
 contacted, and the review diagnostics list the affected keys.
+Generated assets, lockfiles, and minified bundles are skipped by default so model
+evidence stays focused on reviewable source changes; set `skip_generated_files:
+false` in `.cursor-review.yml` only when those files should be reviewed.
 
 ## Common Customizations
 
