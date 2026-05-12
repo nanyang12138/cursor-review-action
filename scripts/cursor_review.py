@@ -7,6 +7,7 @@ from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
+from engine.help import render_help
 from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt, prompt_template_version
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
@@ -27,6 +28,18 @@ def main() -> int:
     set_output("comment_title", run_state["comment_title"])
     set_output("run_metadata_json", run_state["metadata_json"])
     set_output("run_metadata_comment", run_state["metadata_comment"])
+
+    if command == "help":
+        rendered = render_help(settings)
+        Path("cursor_review.md").write_text(rendered, encoding="utf-8")
+        Path("findings.json").write_text("[]", encoding="utf-8")
+        set_output("summary", rendered)
+        set_output("findings_json", "[]")
+        set_output("exit_code", "0")
+        set_output("diff_truncated", "false")
+        set_output("should_comment", "true")
+        write_step_summary(rendered)
+        return 0
 
     if settings.get("command_prompt_source") in {"slash_command", "trigger_phrase"}:
         command_args = parse_command_args(command, user_prompt)

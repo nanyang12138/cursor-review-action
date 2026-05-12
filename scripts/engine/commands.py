@@ -8,7 +8,21 @@ COMMAND_ALIASES = {
     "/cursor-ask": "ask",
     "/cursor-improve": "improve",
     "/cursor-describe": "describe",
+    "/cursor-help": "help",
 }
+
+
+def _matches_trigger(stripped: str, trigger: str) -> bool:
+    return stripped == trigger or stripped.startswith(f"{trigger} ") or stripped.startswith(f"{trigger}\n")
+
+
+def _help_subcommand(remainder: str) -> Tuple[bool, str]:
+    if not remainder:
+        return False, ""
+    parts = remainder.split(None, 1)
+    if parts[0].lower() != "help":
+        return False, ""
+    return True, parts[1].strip() if len(parts) > 1 else ""
 
 
 def derive_command_and_prompt(settings: Dict[str, Any]) -> Tuple[str, str]:
@@ -26,9 +40,14 @@ def derive_command_and_prompt(settings: Dict[str, Any]) -> Tuple[str, str]:
         return command, ""
 
     for trigger, mapped_command in COMMAND_ALIASES.items():
-        if stripped.startswith(trigger):
+        if _matches_trigger(stripped, trigger):
+            remainder = stripped[len(trigger):].strip()
             settings["command_prompt_source"] = "slash_command"
-            return mapped_command, stripped[len(trigger):].strip()
+            if trigger == "/cursor-review":
+                is_help, help_prompt = _help_subcommand(remainder)
+                if is_help:
+                    return "help", help_prompt
+            return mapped_command, remainder
 
     trigger_phrase = str(settings.get("trigger_phrase", "/cursor-review"))
     if trigger_phrase in stripped:
@@ -40,6 +59,8 @@ def derive_command_and_prompt(settings: Dict[str, Any]) -> Tuple[str, str]:
 
 
 def ensure_command_enabled(command: str, settings: Dict[str, Any]) -> Tuple[bool, str]:
+    if command == "help":
+        return True, ""
     enabled = {item.lower() for item in split_csv(settings.get("enabled_commands"))}
     if command in enabled:
         return True, ""

@@ -75,7 +75,7 @@ inputs:
     required: false
     default: "/cursor-review"
   command:
-    description: "Command to run: review, ask, improve, or describe."
+    description: "Command to run: review, ask, improve, describe, or help."
     required: false
     default: "review"
   enabled-commands:
@@ -259,7 +259,8 @@ runs:
             review: 'Cursor Review',
             ask: 'Cursor Ask',
             improve: 'Cursor Improve',
-            describe: 'Cursor Describe'
+            describe: 'Cursor Describe',
+            help: 'Cursor Help'
           };
           const prNumber = Number(process.env.PR_NUMBER);
           const reviewBody = process.env.REVIEW_BODY || 'Cursor review produced no output.';
