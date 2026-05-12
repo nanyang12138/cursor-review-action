@@ -35,6 +35,9 @@ DEFAULTS: Dict[str, Any] = {
     "skip_generated_files": True,
     "scope_mode": "full",
     "scope_files": "",
+    "metadata_cache_enabled": True,
+    "metadata_cache_max_bytes": 10000,
+    "metadata_cache_comment": "",
     "guidance_enabled": True,
     "guidance_files": {
         "general": ".cursor-review-instructions.md",
@@ -66,9 +69,17 @@ INT_SETTINGS: Dict[str, Tuple[int, int]] = {
     "timeout_seconds": (DEFAULTS["timeout_seconds"], 1),
     "guidance_max_bytes": (DEFAULTS["guidance_max_bytes"], 0),
     "guidance_max_lines": (DEFAULTS["guidance_max_lines"], 0),
+    "metadata_cache_max_bytes": (DEFAULTS["metadata_cache_max_bytes"], 0),
 }
 
-BOOL_SETTINGS = {"guidance_enabled", "debug_artifacts", "fail_on_error", "fail_on_findings", "skip_generated_files"}
+BOOL_SETTINGS = {
+    "guidance_enabled",
+    "debug_artifacts",
+    "fail_on_error",
+    "fail_on_findings",
+    "skip_generated_files",
+    "metadata_cache_enabled",
+}
 SUPPORTED_FILTER_MODES = {"added", "diff_context", "file"}
 SAFE_DIAGNOSTIC_VALUE_RE = re.compile(r"^[A-Za-z0-9 ._/@:+,*?=|-]{0,80}$")
 
@@ -347,6 +358,7 @@ def load_settings() -> Dict[str, Any]:
         "skip_generated_files": DEFAULTS["skip_generated_files"],
         "scope_mode": env("INPUT_SCOPE_MODE", DEFAULTS["scope_mode"]),
         "scope_files": env("INPUT_SCOPE_FILES", DEFAULTS["scope_files"]),
+        "metadata_cache_comment": env("INPUT_METADATA_CACHE_COMMENT", DEFAULTS["metadata_cache_comment"]),
         "debug_artifacts": env("INPUT_DEBUG_ARTIFACTS", "false"),
         "fail_on_error": env("INPUT_FAIL_ON_ERROR", "false"),
         "fail_on_findings": env("INPUT_FAIL_ON_FINDINGS", "false"),

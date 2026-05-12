@@ -42,6 +42,12 @@ def format_guidance_for_prompt(repo_guidance: Dict[str, Any]) -> str:
     return "\n\n".join(formatted)
 
 
+def format_describe_metadata_for_prompt(describe_metadata: Dict[str, Any]) -> str:
+    if not describe_metadata:
+        return ""
+    return json.dumps(describe_metadata, ensure_ascii=False, indent=2)
+
+
 def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any]) -> str:
     language = settings.get("language", "zh-CN")
     max_findings = settings.get("max_findings", 5)
@@ -73,6 +79,8 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
     pull_request_context = meta.get("pull_request_context", {})
     repo_guidance = meta.get("repo_guidance") or {"sections": [], "diagnostics": {}}
     guidance_prompt = format_guidance_for_prompt(repo_guidance)
+    describe_metadata = meta.get("describe_metadata") or {}
+    describe_metadata_prompt = format_describe_metadata_for_prompt(describe_metadata)
     diagnostics = {
         "command": command,
         "prompt_template": template_path_for_command(command).name,
@@ -83,11 +91,18 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
         "command_arg_overrides": settings.get("command_arg_overrides", {}),
         "command_arg_warnings": settings.get("command_arg_warnings", []),
         "repo_guidance": repo_guidance.get("diagnostics", {}),
+        "metadata_cache": meta.get("metadata_cache", {}),
         "prompt_template_version": prompt_template_version(),
         "diff_truncated": truncated,
         "diff_meta": meta,
     }
     guidance_section = f"\nRepository guidance:\n{guidance_prompt}\n" if guidance_prompt else ""
+    describe_metadata_section = (
+        "\nCached describe metadata from this PR head SHA:\n"
+        f"{describe_metadata_prompt}\n"
+        if describe_metadata_prompt
+        else ""
+    )
     return f"""{command_instructions(command, user_prompt, settings)}
 
 Diagnostics:
@@ -96,6 +111,7 @@ Diagnostics:
 Pull request context:
 {json.dumps(pull_request_context, ensure_ascii=False, indent=2)}
 {guidance_section}
+{describe_metadata_section}
 
 Diff stat:
 {stat}

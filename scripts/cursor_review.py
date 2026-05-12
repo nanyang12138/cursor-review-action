@@ -22,6 +22,7 @@ from engine.lifecycle import (
     start_lifecycle,
 )
 from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
+from engine.metadata_cache import build_describe_metadata_cache_comment
 from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt, prompt_template_version
 from engine.quality_gate import evaluate_output_quality
@@ -263,6 +264,13 @@ def main(argv: list[str] | None = None) -> int:
     findings_json = quality_result.findings_json
     parser_diagnostics["quality_gate"] = quality_result.diagnostics
     runner_diagnostics["quality_gate"] = quality_result.diagnostics
+    metadata_cache_comment, metadata_cache_diagnostics = build_describe_metadata_cache_comment(
+        command,
+        findings_json,
+        settings,
+        quality_result.diagnostics,
+    )
+    runner_diagnostics["metadata_cache"] = metadata_cache_diagnostics
     ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
     runner_diagnostics["ci_policy"] = ci_policy
     settings["lifecycle"] = finalize_lifecycle(
@@ -293,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
 
     set_output("summary", rendered)
     set_output("findings_json", findings_json)
+    set_output("metadata_cache_comment", metadata_cache_comment)
     set_output("ci_policy_json", ci_policy_json(ci_policy))
     set_output("exit_code", str(exit_code))
     set_output("diff_truncated", str(context.truncated).lower())

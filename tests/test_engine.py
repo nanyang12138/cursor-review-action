@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, lifecycle, localization, parser, prompts, quality_gate, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, lifecycle, localization, metadata_cache, parser, prompts, quality_gate, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -463,6 +463,149 @@ class ContextBuilderTests(unittest.TestCase):
         self.assertEqual(pr_context["changed_files"], ["scripts/engine/parser.py", "tests/test_engine.py"])
         self.assertEqual(pr_context["diff_stat"], "parser.py | 2 +")
         self.assertEqual(pr_context["comment_prompt"], "Focus on tests.")
+
+
+class MetadataCacheTests(unittest.TestCase):
+    def _describe_cache_comment(self, head_sha: str = "head-sha") -> str:
+        comment, diagnostics = metadata_cache.build_describe_metadata_cache_comment(
+            "describe",
+            json.dumps(
+                {
+                    "schema_version": schemas.OUTPUT_SCHEMA_VERSION,
+                    "command": "describe",
+                    "summary": "Adds parser metadata cache.",
+                    "walkthrough": ["Updates scripts/engine/metadata_cache.py"],
+                    "risks": ["Secret ghp_abcdefghijklmnopqrstuvwxyz123456 should be redacted."],
+                    "tests": ["python -m unittest"],
+                    "changelog": "No public API change.",
+                }
+            ),
+            {
+                "head_sha": head_sha,
+                "prompt_template_version": prompts.prompt_template_version(),
+                "metadata_cache_enabled": True,
+                "metadata_cache_max_bytes": 10000,
+                "run_state": {"generated_at": "2026-05-12T20:00:00Z", "head_sha": head_sha},
+            },
+            {"publish_decision": "publish"},
+        )
+        self.assertEqual(diagnostics["status"], "valid")
+        return comment
+
+    def test_describe_metadata_cache_comment_is_hidden_redacted_and_parseable(self) -> None:
+        comment = self._describe_cache_comment()
+
+        self.assertTrue(comment.startswith(metadata_cache.METADATA_CACHE_MARKER_PREFIX))
+        match = metadata_cache.METADATA_CACHE_MARKER_RE.search(comment)
+        self.assertIsNotNone(match)
+        payload = json.loads(match.group(1))
+        self.assertEqual(payload["schema_version"], metadata_cache.METADATA_CACHE_SCHEMA_VERSION)
+        self.assertEqual(payload["source_command"], "describe")
+        self.assertEqual(payload["head_sha"], "head-sha")
+        self.assertEqual(payload["output_schema_version"], schemas.OUTPUT_SCHEMA_VERSION)
+        self.assertIn("Adds parser metadata cache.", payload["content"]["summary"])
+        self.assertNotIn("ghp_abcdefghijklmnopqrstuvwxyz123456", comment)
+        self.assertIn("[REDACTED]", comment)
+
+    def test_resolve_metadata_cache_requires_enabled_matching_head_and_schema(self) -> None:
+        comment = self._describe_cache_comment("current-head")
+
+        valid = metadata_cache.resolve_metadata_cache(
+            {"resolved_command": "review", "head_sha": "current-head", "metadata_cache_comment": comment},
+            "review",
+        )
+        stale = metadata_cache.resolve_metadata_cache(
+            {"resolved_command": "review", "head_sha": "new-head", "metadata_cache_comment": comment},
+            "review",
+        )
+        disabled = metadata_cache.resolve_metadata_cache(
+            {
+                "resolved_command": "review",
+                "head_sha": "current-head",
+                "metadata_cache_comment": comment,
+                "metadata_cache_enabled": False,
+            },
+            "review",
+        )
+        describe_consumer = metadata_cache.resolve_metadata_cache(
+            {"resolved_command": "describe", "head_sha": "current-head", "metadata_cache_comment": comment},
+            "describe",
+        )
+
+        self.assertEqual(valid["diagnostics"]["status"], "valid")
+        self.assertEqual(valid["content"]["summary"], "Adds parser metadata cache.")
+        self.assertEqual(stale["diagnostics"]["status"], "stale")
+        self.assertEqual(stale["diagnostics"]["reason"], "head_sha_mismatch")
+        self.assertEqual(stale["content"], {})
+        self.assertEqual(disabled["diagnostics"]["status"], "disabled")
+        self.assertEqual(describe_consumer["diagnostics"]["status"], "not_applicable")
+
+    def test_context_and_prompt_reuse_valid_describe_metadata_without_raw_comment(self) -> None:
+        cache_comment = self._describe_cache_comment("head-sha")
+        settings = {
+            "resolved_command": "review",
+            "head_sha": "head-sha",
+            "metadata_cache_comment": cache_comment,
+            "metadata_cache_enabled": True,
+            "metadata_cache_max_bytes": 10000,
+            "language": "en",
+            "max_findings": 5,
+            "review_focus": "correctness",
+            "model": "auto",
+        }
+        diff_meta = {"head": "head-sha", "files": ["scripts/engine/metadata_cache.py"]}
+
+        with mock.patch.object(
+            context,
+            "build_diff",
+            return_value=("diff --git a/scripts/engine/metadata_cache.py b/scripts/engine/metadata_cache.py", " metadata_cache.py | 5 +", False, diff_meta),
+        ):
+            review_context = context.build_review_context(settings)
+
+        prompt = prompts.build_prompt(
+            "review",
+            "",
+            review_context.diff_text,
+            review_context.stat,
+            review_context.truncated,
+            review_context.meta,
+            settings,
+        )
+
+        self.assertEqual(review_context.meta["metadata_cache"]["status"], "valid")
+        self.assertEqual(review_context.meta["metadata_cache"]["reason"], "metadata_cache_reused")
+        self.assertEqual(review_context.meta["describe_metadata"]["summary"], "Adds parser metadata cache.")
+        self.assertIn("Cached describe metadata from this PR head SHA:", prompt)
+        self.assertIn("Adds parser metadata cache.", prompt)
+
+    def test_render_comment_reports_metadata_cache_diagnostics_without_content(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {
+                "files": ["a.py"],
+                "metadata_cache": {
+                    "schema_version": metadata_cache.METADATA_CACHE_SCHEMA_VERSION,
+                    "enabled": True,
+                    "status": "valid",
+                    "reason": "metadata_cache_reused",
+                    "source": "comment_marker",
+                    "head_sha_match": True,
+                    "bytes": 321,
+                },
+                "describe_metadata": {"summary": "Sensitive cached summary"},
+            },
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("Metadata cache schema: `metadata-cache/v1`", rendered)
+        self.assertIn("Metadata cache status: `valid`", rendered)
+        self.assertIn("Metadata cache head match: `true`", rendered)
+        self.assertNotIn("Sensitive cached summary", rendered)
 
 
 class RepoGuidanceTests(unittest.TestCase):

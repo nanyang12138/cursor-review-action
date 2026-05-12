@@ -231,6 +231,15 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
             diagnostics.append(f"- Config warning: `{warning}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
+    metadata_cache = meta.get("metadata_cache") or runner_diagnostics.get("metadata_cache") or {}
+    if metadata_cache:
+        diagnostics.append(f"- Metadata cache schema: `{metadata_cache.get('schema_version', 'unknown')}`")
+        diagnostics.append(f"- Metadata cache enabled: `{str(metadata_cache.get('enabled', False)).lower()}`")
+        diagnostics.append(f"- Metadata cache status: `{metadata_cache.get('status', 'unknown')}`")
+        diagnostics.append(f"- Metadata cache reason: `{metadata_cache.get('reason', 'unknown')}`")
+        diagnostics.append(f"- Metadata cache source: `{metadata_cache.get('source', 'none')}`")
+        diagnostics.append(f"- Metadata cache head match: `{str(metadata_cache.get('head_sha_match', False)).lower()}`")
+        diagnostics.append(f"- Metadata cache bytes: `{metadata_cache.get('bytes', 0)}`")
     privacy = privacy_diagnostics(settings, redaction_summary)
     diagnostics.append(f"- Privacy redaction schema: `{privacy.get('schema_version')}`")
     diagnostics.append(f"- Redaction status: `{privacy.get('redaction_status')}`")

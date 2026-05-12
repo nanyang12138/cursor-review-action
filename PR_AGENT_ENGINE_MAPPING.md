@@ -1621,6 +1621,26 @@ Validation checklist:
 - Metadata cache content is redacted before publishing.
 - Commands can disable metadata reuse.
 
+Implementation evidence:
+
+- `scripts/engine/metadata_cache.py` defines `metadata-cache/v1` hidden markers,
+  generation from redacted `/cursor-describe` structured output, and validation
+  for schema version, source command, output schema, head SHA, enabled state, and
+  byte budget.
+- `action.yml` reads only the latest bot-owned describe metadata marker before
+  the Python engine runs, and publishes a new hidden marker only when describe
+  output passes local quality checks.
+- `scripts/engine/context.py` and `scripts/engine/prompts.py` inject validated
+  describe metadata into review/improve prompt context without changing selected
+  diff scope or raw PR comment behavior.
+- `scripts/engine/render.py` reports metadata cache diagnostics without exposing
+  cached content, raw prompts, raw diffs, or token-like strings.
+- `docs/metadata-cache.md` documents comment-only cache semantics, disable rules,
+  stale-cache fallback, diagnostics, privacy boundaries, and P2 deferrals.
+- `tests/test_engine.py::MetadataCacheTests` covers marker generation, redaction,
+  matching-head reuse, stale/disabled/not-applicable fallback, prompt injection,
+  and rendered diagnostics.
+
 ### Scope Control and Non-Goals
 
 PR-Agent behavior to learn from:
