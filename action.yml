@@ -158,6 +158,10 @@ inputs:
     description: "Fail the workflow when high severity findings are found. Reserved for future use."
     required: false
     default: "false"
+  debug-artifacts:
+    description: "Write redacted prompt and raw Cursor output debug files. Off by default to avoid storing raw PR data."
+    required: false
+    default: "false"
   install-cursor:
     description: "Install Cursor CLI before running review."
     required: false
@@ -236,6 +240,7 @@ runs:
         INPUT_SCOPE_FILES: ${{ inputs.scope-files }}
         INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
         INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        INPUT_DEBUG_ARTIFACTS: ${{ inputs.debug-artifacts }}
       run: python3 "$GITHUB_ACTION_PATH/scripts/cursor_review.py"
 
     - name: Create or update PR comment

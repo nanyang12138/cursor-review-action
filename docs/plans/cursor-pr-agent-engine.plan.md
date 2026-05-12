@@ -115,7 +115,7 @@ todos:
     status: completed
   - id: privacy-logging
     content: 定义发送给 Cursor、写入 Actions logs、写入 PR comments 的数据边界和 secret redaction 策略
-    status: pending
+    status: completed
   - id: supply-chain
     content: 建立依赖/发布 checklist，保持 engine stdlib-only，稳定 release 后示例切换到 tag
     status: pending

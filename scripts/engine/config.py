@@ -39,6 +39,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "guidance_max_bytes": 20000,
     "guidance_max_lines": 400,
+    "debug_artifacts": False,
     "fail_on_error": False,
     "fail_on_findings": False,
     "trigger_phrase": "/cursor-review",
@@ -189,6 +190,7 @@ def load_settings() -> Dict[str, Any]:
         "exclude_patterns": env("INPUT_EXCLUDE_PATTERNS", ""),
         "scope_mode": env("INPUT_SCOPE_MODE", DEFAULTS["scope_mode"]),
         "scope_files": env("INPUT_SCOPE_FILES", DEFAULTS["scope_files"]),
+        "debug_artifacts": env("INPUT_DEBUG_ARTIFACTS", "false"),
         "fail_on_error": env("INPUT_FAIL_ON_ERROR", "false"),
         "fail_on_findings": env("INPUT_FAIL_ON_FINDINGS", "false"),
     }
@@ -207,6 +209,7 @@ def load_settings() -> Dict[str, Any]:
     settings["guidance_enabled"] = to_bool(settings.get("guidance_enabled"))
     settings["guidance_max_bytes"] = max(to_int(settings.get("guidance_max_bytes"), DEFAULTS["guidance_max_bytes"]), 0)
     settings["guidance_max_lines"] = max(to_int(settings.get("guidance_max_lines"), DEFAULTS["guidance_max_lines"]), 0)
+    settings["debug_artifacts"] = to_bool(settings.get("debug_artifacts"))
     settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
     settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
     language_diagnostics = normalize_language(settings.get("language"))
