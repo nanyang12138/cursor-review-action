@@ -26,6 +26,7 @@ This action is intentionally smaller:
 - Automatically review PRs when they are opened, updated, or reopened.
 - Manually review, ask about, improve, or describe a PR with slash commands.
 - Accept extra instructions after a supported slash command.
+- Accept allowlisted slash command arguments such as `--focus` and `--max-findings`.
 - Use a repo-local `.cursor-review.yml` configuration file.
 - Select a Cursor model with the `model` input.
 - Filter files with include/exclude patterns.
@@ -125,10 +126,25 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            async function setPullRequestOutputs(pr) {
+              core.setOutput('number', pr.number);
+              core.setOutput('base_sha', pr.base.sha);
+              core.setOutput('head_sha', pr.head.sha);
+              core.setOutput('title', pr.title || '');
+              core.setOutput('body', pr.body || '');
+              core.setOutput('base_ref', pr.base.ref || '');
+              core.setOutput('head_ref', pr.head.ref || '');
+              const commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                per_page: 100
+              });
+              core.setOutput('commit_messages', commits.map((item) => item.commit.message.split('\n')[0]).join('\n'));
+            }
+
             if (context.eventName === 'pull_request') {
-              core.setOutput('number', context.payload.pull_request.number);
-              core.setOutput('base_sha', context.payload.pull_request.base.sha);
-              core.setOutput('head_sha', context.payload.pull_request.head.sha);
+              await setPullRequestOutputs(context.payload.pull_request);
               return;
             }
 
@@ -138,9 +154,7 @@ jobs:
               pull_number: context.issue.number
             });
 
-            core.setOutput('number', pr.data.number);
-            core.setOutput('base_sha', pr.data.base.sha);
-            core.setOutput('head_sha', pr.data.head.sha);
+            await setPullRequestOutputs(pr.data);
 
       - name: Checkout PR
         uses: actions/checkout@v4
@@ -156,6 +170,11 @@ jobs:
           base-sha: ${{ steps.pr.outputs.base_sha }}
           head-sha: ${{ steps.pr.outputs.head_sha }}
           pr-number: ${{ steps.pr.outputs.number }}
+          pr-title: ${{ steps.pr.outputs.title }}
+          pr-body: ${{ steps.pr.outputs.body }}
+          base-ref: ${{ steps.pr.outputs.base_ref }}
+          head-ref: ${{ steps.pr.outputs.head_ref }}
+          commit-messages: ${{ steps.pr.outputs.commit_messages }}
           event-name: ${{ github.event_name }}
           comment-body: ${{ github.event_name == 'issue_comment' && github.event.comment.body || '' }}
           enabled-commands: review,ask,improve,describe
@@ -241,7 +260,7 @@ exclude_patterns:
 Configuration precedence:
 
 ```text
-PR comment prompt > .cursor-review.yml > workflow inputs > action defaults
+slash command arguments > PR comment prompt > .cursor-review.yml > workflow inputs > action defaults
 ```
 
 ## Common Customizations
@@ -293,6 +312,9 @@ Important inputs:
 - `github-token`: Token used to create or update PR comments, usually `${{ github.token }}`.
 - `base-sha` / `head-sha`: PR diff range.
 - `pr-number`: PR number for comment output.
+- `pr-title` / `pr-body`: PR title and description passed as review context.
+- `base-ref` / `head-ref`: Base and source branch names passed as review context.
+- `commit-messages`: Newline-separated commit messages passed as review context.
 - `event-name`: GitHub event name.
 - `comment-body`: PR comment body used to extract extra instructions.
 - `model`: Cursor model. Default: `auto`.
@@ -319,13 +341,27 @@ Supported slash commands:
 
 The recommended workflow and `.cursor-review.yml` enable all four commands. If you pass `enabled-commands` manually, include every command you want to allow.
 
+`/cursor-review` supports a small allowlist of per-run arguments:
+
+```text
+/cursor-review --focus=security,tests --max-findings=3
+Check authentication edge cases first.
+```
+
+Supported arguments:
+
+- `--focus` or `--review-focus`: comma-separated review focus values.
+- `--max-findings`: integer from 1 to 50.
+
+Unknown arguments are not used as configuration overrides. They remain ordinary prompt text and are never passed to a shell.
+
 ## Security Model
 
 - Never hardcode `CURSOR_API_KEY` in workflow files.
 - Keep GitHub token permissions minimal.
 - Restrict comment-triggered runs to trusted users.
 - Treat PR comments and diff content as untrusted prompt input.
-- The action passes comment text to Cursor as prompt text only; it does not execute comment text as shell.
+- The action parses only allowlisted slash command arguments and passes remaining comment text to Cursor as prompt text only; it does not execute comment text as shell.
 
 The example workflow restricts manual triggers to:
 

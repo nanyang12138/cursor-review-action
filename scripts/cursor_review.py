@@ -2,6 +2,7 @@
 import sys
 from pathlib import Path
 
+from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
@@ -15,7 +16,20 @@ def main() -> int:
     settings = load_settings()
     command, user_prompt = derive_command_and_prompt(settings)
     settings["resolved_command"] = command
+    settings["resolved_user_prompt"] = user_prompt
     set_output("resolved_command", command)
+
+    if settings.get("command_prompt_source") in {"slash_command", "trigger_phrase"}:
+        command_args = parse_command_args(command, user_prompt)
+        user_prompt = command_args.user_prompt
+        settings.update(command_args.overrides)
+        settings["command_arg_overrides"] = command_args.overrides
+        settings["command_arg_keys"] = command_args.parsed_args
+        settings["command_arg_warnings"] = command_args.warnings
+    else:
+        settings["command_arg_overrides"] = {}
+        settings["command_arg_keys"] = []
+        settings["command_arg_warnings"] = []
 
     enabled, message = ensure_command_enabled(command, settings)
     if not enabled:

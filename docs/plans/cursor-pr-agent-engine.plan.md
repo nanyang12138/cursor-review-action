@@ -52,13 +52,13 @@ todos:
     status: completed
   - id: command-args
     content: 实现安全的 slash command 参数解析，例如 --focus、--max-findings，并禁止任意参数进入 shell
-    status: pending
+    status: completed
   - id: command-templates
     content: 为 review/ask/improve/describe 建立独立 prompt template 和 output schema
     status: pending
   - id: context-builder
     content: 加入 PR title/body、commit messages、changed files、diff stat、comment prompt 等上下文
-    status: pending
+    status: completed
   - id: diff-selector
     content: 实现 token/bytes-aware diff selection，并输出 reviewed/skipped files
     status: completed

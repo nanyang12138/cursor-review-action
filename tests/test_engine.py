@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import commands, config, context, diff_selector, parser, prompts, render, runner  # noqa: E402
+from engine import command_args, commands, config, context, parser, prompts, render, runner  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -27,6 +27,7 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(command, "ask")
         self.assertEqual(user_prompt, "Why did this change?")
+        self.assertEqual(settings["command_prompt_source"], "slash_command")
 
     def test_explicit_user_prompt_keeps_configured_command(self) -> None:
         settings = {
@@ -45,6 +46,31 @@ class CommandTests(unittest.TestCase):
 
         self.assertFalse(enabled)
         self.assertEqual(message, "Command `ask` is not enabled. Enabled commands: review.")
+
+    def test_command_args_override_known_settings_and_preserve_prompt(self) -> None:
+        result = command_args.parse_command_args(
+            "review",
+            "--focus=security,tests --max-findings 3\nCheck auth boundaries.",
+        )
+
+        self.assertEqual(result.overrides, {"review_focus": "security,tests", "max_findings": 3})
+        self.assertEqual(result.parsed_args, ["--focus", "--max-findings"])
+        self.assertEqual(result.user_prompt, "Check auth boundaries.")
+        self.assertEqual(result.warnings, [])
+
+    def test_unknown_command_arg_remains_prompt_text(self) -> None:
+        result = command_args.parse_command_args("review", "--shell='rm -rf /' Check this.")
+
+        self.assertEqual(result.overrides, {})
+        self.assertEqual(result.user_prompt, "--shell='rm -rf /' Check this.")
+        self.assertEqual(len(result.warnings), 1)
+
+    def test_invalid_command_arg_value_is_consumed_with_warning(self) -> None:
+        result = command_args.parse_command_args("review", "--max-findings=not-a-number Check this.")
+
+        self.assertEqual(result.overrides, {})
+        self.assertEqual(result.user_prompt, "Check this.")
+        self.assertEqual(result.warnings, ["--max-findings must be an integer and was ignored."])
 
 
 class ConfigTests(unittest.TestCase):
@@ -71,6 +97,65 @@ exclude_patterns: ["dist/**", "*.lock"]
         self.assertTrue(loaded["fail_on_error"])
         self.assertEqual(loaded["enabled_commands"], ["review", "ask"])
         self.assertEqual(loaded["exclude_patterns"], ["dist/**", "*.lock"])
+
+    def test_load_settings_reads_pr_metadata_inputs(self) -> None:
+        env = {
+            "INPUT_PR_NUMBER": "42",
+            "INPUT_PR_TITLE": "Add safer parser",
+            "INPUT_PR_BODY": "Implements parser guardrails.",
+            "INPUT_BASE_REF": "main",
+            "INPUT_HEAD_REF": "feature/parser",
+            "INPUT_COMMIT_MESSAGES": "Add parser\nAdd tests",
+        }
+
+        with mock.patch.dict(os.environ, env, clear=True):
+            settings = config.load_settings()
+
+        self.assertEqual(settings["pr_title"], "Add safer parser")
+        self.assertEqual(settings["pr_body"], "Implements parser guardrails.")
+        self.assertEqual(settings["base_ref"], "main")
+        self.assertEqual(settings["head_ref"], "feature/parser")
+        self.assertEqual(settings["commit_messages"], "Add parser\nAdd tests")
+
+
+class ContextBuilderTests(unittest.TestCase):
+    def test_build_review_context_adds_structured_pr_metadata(self) -> None:
+        settings = {
+            "pr_number": "42",
+            "pr_title": "Add safer parser",
+            "pr_body": "Implements parser guardrails.",
+            "base_ref": "main",
+            "head_ref": "feature/parser",
+            "event_name": "pull_request",
+            "resolved_command": "review",
+            "resolved_user_prompt": "Focus on tests.",
+            "commit_messages": "Add parser\nAdd tests",
+            "config_loaded": ".cursor-review.yml",
+        }
+        diff_meta = {
+            "base": "base-sha",
+            "head": "head-sha",
+            "range": "base-sha...head-sha",
+            "files": ["scripts/engine/parser.py", "tests/test_engine.py"],
+        }
+
+        with mock.patch.object(
+            context,
+            "build_diff",
+            return_value=("diff --git a/a.py b/a.py", " parser.py | 2 +", False, diff_meta),
+        ):
+            review_context = context.build_review_context(settings)
+
+        pr_context = review_context.meta["pull_request_context"]
+        self.assertEqual(pr_context["pr_number"], "42")
+        self.assertEqual(pr_context["title"], "Add safer parser")
+        self.assertEqual(pr_context["body"], "Implements parser guardrails.")
+        self.assertEqual(pr_context["base_ref"], "main")
+        self.assertEqual(pr_context["head_ref"], "feature/parser")
+        self.assertEqual(pr_context["commit_messages"], ["Add parser", "Add tests"])
+        self.assertEqual(pr_context["changed_files"], ["scripts/engine/parser.py", "tests/test_engine.py"])
+        self.assertEqual(pr_context["diff_stat"], "parser.py | 2 +")
+        self.assertEqual(pr_context["comment_prompt"], "Focus on tests.")
 
 
 class DiffSelectorTests(unittest.TestCase):
@@ -131,6 +216,42 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("<review_markdown>", prompt)
         self.assertIn('"diff_truncated": false', prompt)
 
+    def test_build_prompt_includes_pull_request_context(self) -> None:
+        settings = {
+            "language": "en",
+            "max_findings": 5,
+            "review_focus": "correctness",
+            "model": "auto",
+            "config_loaded": "",
+        }
+        meta = {
+            "files": ["a.py"],
+            "pull_request_context": {
+                "pr_number": "42",
+                "title": "Add safer parser",
+                "body": "Parser guardrails.",
+                "base_ref": "main",
+                "head_ref": "feature/parser",
+                "commit_messages": ["Add parser"],
+                "changed_files": ["a.py"],
+                "diff_stat": "a.py | 1 +",
+            },
+        }
+
+        prompt = prompts.build_prompt(
+            "review",
+            "",
+            "diff --git a/a.py b/a.py",
+            " a.py | 1 +",
+            False,
+            meta,
+            settings,
+        )
+
+        self.assertIn("Pull request context:", prompt)
+        self.assertIn('"title": "Add safer parser"', prompt)
+        self.assertIn('"commit_messages": [', prompt)
+
     def test_parse_agent_output_formats_valid_findings_json(self) -> None:
         raw = """
 <review_markdown>No issues.</review_markdown>
@@ -171,6 +292,30 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Diff truncated: `true`", rendered)
         self.assertIn("Files reviewed: `2`", rendered)
         self.assertIn("Files skipped: `0`", rendered)
+
+    def test_render_comment_reports_context_presence_without_leaking_body(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {
+                "files": ["a.py"],
+                "pull_request_context": {
+                    "title": "Sensitive title",
+                    "body": "Sensitive body",
+                    "commit_messages": ["Add parser"],
+                },
+            },
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("PR title provided: `true`", rendered)
+        self.assertIn("PR body provided: `true`", rendered)
+        self.assertIn("Commit messages provided: `1`", rendered)
+        self.assertNotIn("Sensitive body", rendered)
 
 
 class RunnerContractTests(unittest.TestCase):
@@ -261,13 +406,14 @@ class EntrypointTests(unittest.TestCase):
             env = {
                 "INPUT_COMMAND": "review",
                 "INPUT_ENABLED_COMMANDS": "review",
+                "INPUT_COMMENT_BODY": "/cursor-review --focus=security,tests --max-findings=2\nCheck auth.",
                 "INPUT_CONFIG_PATH": str(Path(tmp) / "missing.yml"),
                 "GITHUB_OUTPUT": str(Path(tmp) / "outputs.txt"),
                 "GITHUB_STEP_SUMMARY": str(Path(tmp) / "summary.md"),
             }
             with mock.patch.dict(os.environ, env, clear=True):
                 with mock.patch.object(cursor_review, "build_review_context", return_value=fake_context):
-                    with mock.patch.object(cursor_review, "run_cursor_result", return_value=fake_runner_result):
+                    with mock.patch.object(cursor_review, "run_cursor_result", return_value=fake_runner_result) as run_cursor:
                         cwd = os.getcwd()
                         os.chdir(tmp)
                         try:
@@ -279,6 +425,10 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("No issues found.", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
+            prompt = run_cursor.call_args.args[0]
+            self.assertIn("Maximum findings: 2.", prompt)
+            self.assertIn("Review focus: security, tests.", prompt)
+            self.assertIn("Check auth.", prompt)
 
 
 if __name__ == "__main__":

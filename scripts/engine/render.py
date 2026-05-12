@@ -16,15 +16,19 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Findings JSON parsed: `{str(parsed_ok).lower()}`",
         f"- Cursor exit code: `{exit_code}`",
     ]
+    if settings.get("command_arg_keys"):
+        diagnostics.append(f"- Command args applied: `{', '.join(settings.get('command_arg_keys', []))}`")
+    for warning in settings.get("command_arg_warnings", []):
+        diagnostics.append(f"- Command args warning: `{warning}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
-    reviewed_files = meta.get("reviewed_files") or [{"path": path} for path in meta.get("files", [])]
-    skipped_files = meta.get("skipped_files") or []
-    diagnostics.append(f"- Files reviewed: `{len(reviewed_files)}`")
-    diagnostics.append(f"- Files skipped: `{len(skipped_files)}`")
-    if skipped_files:
-        preview = ", ".join(f"{item.get('path')} ({item.get('reason')})" for item in skipped_files[:5])
-        diagnostics.append(f"- Skipped files: `{preview}`")
+    diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")
+    pull_request_context = meta.get("pull_request_context") or {}
+    if pull_request_context:
+        commit_count = len(pull_request_context.get("commit_messages") or [])
+        diagnostics.append(f"- PR title provided: `{str(bool(pull_request_context.get('title'))).lower()}`")
+        diagnostics.append(f"- PR body provided: `{str(bool(pull_request_context.get('body'))).lower()}`")
+        diagnostics.append(f"- Commit messages provided: `{commit_count}`")
 
     if exit_code != 0:
         markdown = f"""Cursor review failed before producing a reliable result.
