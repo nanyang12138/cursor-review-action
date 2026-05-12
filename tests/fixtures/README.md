@@ -6,7 +6,7 @@ parsing, and rendered diagnostics.
 
 Each concrete fixture must declare capability IDs so product parity claims can be
 traced back to repeatable evidence in `docs/parity-scorecard.md`. The harness
-currently has 12 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
+currently has 13 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
 volume gate while the `v1` target remains 20 fixtures. The review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
@@ -17,6 +17,9 @@ volume gate while the `v1` target remains 20 fixtures. The review harness covers
 - `large_partial_review`: partial review diagnostics for budget-limited diffs.
 - `ask_question`: command-specific ask schema and answer rendering.
 - `describe_summary`: command-specific describe schema and comment-only summary.
+- `improve_suggestions`: command-specific improve schema, author-facing
+  suggestion rendering, and repo guidance diagnostics for general plus
+  improve-only guidance files.
 - `invalid_finding_anchor`: selected-diff grounding fixture that keeps an
   anchored finding while downgrading a skipped-file finding.
 - `duplicate_findings`: same-run deduplication fixture that collapses duplicate
