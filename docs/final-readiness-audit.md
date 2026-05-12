@@ -81,6 +81,10 @@ publishing a PR comment.
 - Evidence notes: the dry-run used the current goal PR branch against
   `origin/main`; the partial state was caused by the configured selected-diff
   budget and produced the expected coverage diagnostics rather than a failure.
+- PR update note: the automation attempted to update the existing long-lived PR
+  body, but the PR update tool was bound to the initial per-run branch rather
+  than this long-lived goal branch. The branch update was pushed instead, and no
+  replacement PR was created.
 - Release policy: no auto-merge, no tag creation, and no release publication
   were performed.
 
