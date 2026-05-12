@@ -20,6 +20,7 @@ This action is intentionally smaller:
 - It supports automatic PR review and manual `/cursor-review`, `/cursor-ask`, `/cursor-improve`, and `/cursor-describe` comments.
 - It lets reviewers add extra prompt instructions directly in a PR comment.
 - It is easy to copy into personal repos, prototypes, and small team repos.
+- It checks trigger trust before contacting Cursor, so untrusted slash commands and fork PRs without secrets are skipped safely.
 
 ## What It Can Do
 
@@ -134,6 +135,7 @@ jobs:
               core.setOutput('body', pr.body || '');
               core.setOutput('base_ref', pr.base.ref || '');
               core.setOutput('head_ref', pr.head.ref || '');
+              core.setOutput('is_fork', String(Boolean(pr.head.repo && pr.head.repo.fork)));
               const commits = await github.paginate(github.rest.pulls.listCommits, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -174,9 +176,11 @@ jobs:
           pr-body: ${{ steps.pr.outputs.body }}
           base-ref: ${{ steps.pr.outputs.base_ref }}
           head-ref: ${{ steps.pr.outputs.head_ref }}
+          pr-is-fork: ${{ steps.pr.outputs.is_fork }}
           commit-messages: ${{ steps.pr.outputs.commit_messages }}
           event-name: ${{ github.event_name }}
           comment-body: ${{ github.event_name == 'issue_comment' && github.event.comment.body || '' }}
+          comment-author-association: ${{ github.event_name == 'issue_comment' && github.event.comment.author_association || '' }}
           enabled-commands: review,ask,improve,describe
           model: auto
           language: zh-CN
@@ -314,9 +318,12 @@ Important inputs:
 - `pr-number`: PR number for comment output.
 - `pr-title` / `pr-body`: PR title and description passed as review context.
 - `base-ref` / `head-ref`: Base and source branch names passed as review context.
+- `pr-is-fork`: Whether the PR head repo is a fork. Used for pre-Cursor trigger trust diagnostics.
 - `commit-messages`: Newline-separated commit messages passed as review context.
 - `event-name`: GitHub event name.
 - `comment-body`: PR comment body used to extract extra instructions.
+- `comment-author-association`: GitHub author association for `issue_comment` slash command trust checks.
+- `trusted-author-associations`: Comma-separated trusted associations. Default: `OWNER,MEMBER,COLLABORATOR`.
 - `model`: Cursor model. Default: `auto`.
 - `language`: Output language. Default: `zh-CN`.
 - `review-focus`: Comma-separated review focus list.
@@ -362,6 +369,7 @@ Unknown arguments are not used as configuration overrides. They remain ordinary 
 - Restrict comment-triggered runs to trusted users.
 - Treat PR comments and diff content as untrusted prompt input.
 - The action parses only allowlisted slash command arguments and passes remaining comment text to Cursor as prompt text only; it does not execute comment text as shell.
+- The action also enforces the same trusted author association policy before context construction and Cursor CLI execution.
 
 The example workflow restricts manual triggers to:
 

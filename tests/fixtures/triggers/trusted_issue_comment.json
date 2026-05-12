@@ -1,0 +1,15 @@
+{
+  "capability_ids": ["SEC-TRIGGER-P0"],
+  "settings": {
+    "event_name": "issue_comment",
+    "command_prompt_source": "slash_command",
+    "comment_author_association": "MEMBER",
+    "trusted_author_associations": "OWNER,MEMBER,COLLABORATOR",
+    "cursor_api_key_present": true
+  },
+  "expected": {
+    "allowed": true,
+    "reason": "trusted_issue_comment_command",
+    "should_comment": true
+  }
+}

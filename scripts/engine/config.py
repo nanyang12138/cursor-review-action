@@ -19,6 +19,9 @@ DEFAULTS: Dict[str, Any] = {
     "pr_body": "",
     "base_ref": "",
     "head_ref": "",
+    "pr_is_fork": "",
+    "comment_author_association": "",
+    "trusted_author_associations": "OWNER,MEMBER,COLLABORATOR",
     "commit_messages": "",
     "include_patterns": "",
     "exclude_patterns": "",
@@ -123,6 +126,11 @@ def load_settings() -> Dict[str, Any]:
         "pr_body": env("INPUT_PR_BODY"),
         "base_ref": env("INPUT_BASE_REF"),
         "head_ref": env("INPUT_HEAD_REF"),
+        "pr_is_fork": env("INPUT_PR_IS_FORK"),
+        "comment_author_association": env("INPUT_COMMENT_AUTHOR_ASSOCIATION"),
+        "trusted_author_associations": env(
+            "INPUT_TRUSTED_AUTHOR_ASSOCIATIONS", DEFAULTS["trusted_author_associations"]
+        ),
         "commit_messages": env("INPUT_COMMIT_MESSAGES"),
         "event_name": env("INPUT_EVENT_NAME"),
         "comment_body": env("INPUT_COMMENT_BODY"),
@@ -154,5 +162,6 @@ def load_settings() -> Dict[str, Any]:
     settings["timeout_seconds"] = to_int(settings.get("timeout_seconds"), DEFAULTS["timeout_seconds"])
     settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
     settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
+    settings["cursor_api_key_present"] = bool(env("CURSOR_API_KEY").strip())
     settings["config_loaded"] = str(config_path if config_path.exists() else "")
     return settings

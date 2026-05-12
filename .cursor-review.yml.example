@@ -10,6 +10,10 @@ max_findings: 5
 max_diff_bytes: 120000
 filter_mode: added
 persistent_comment: true
+trusted_author_associations:
+  - OWNER
+  - MEMBER
+  - COLLABORATOR
 enabled_commands:
   - review
 include_patterns: []

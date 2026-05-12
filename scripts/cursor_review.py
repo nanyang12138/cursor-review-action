@@ -8,8 +8,9 @@ from engine.context import build_review_context
 from engine.config import load_settings
 from engine.parser import parse_agent_output
 from engine.prompts import build_prompt
-from engine.render import render_comment, set_output, write_step_summary
+from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
+from engine.trust_policy import evaluate_trigger_trust
 
 
 def main() -> int:
@@ -38,6 +39,21 @@ def main() -> int:
         set_output("findings_json", "[]")
         set_output("exit_code", "78")
         set_output("diff_truncated", "false")
+        set_output("should_comment", "true")
+        write_step_summary(rendered)
+        return 78 if settings.get("fail_on_error") else 0
+
+    trigger_decision = evaluate_trigger_trust(settings)
+    settings["trigger_trust"] = trigger_decision.diagnostics
+    if not trigger_decision.allowed:
+        rendered = render_trigger_skip(trigger_decision.diagnostics, settings)
+        Path("cursor_review.md").write_text(rendered, encoding="utf-8")
+        Path("findings.json").write_text("[]", encoding="utf-8")
+        set_output("summary", rendered)
+        set_output("findings_json", "[]")
+        set_output("exit_code", "78")
+        set_output("diff_truncated", "false")
+        set_output("should_comment", str(trigger_decision.should_comment).lower())
         write_step_summary(rendered)
         return 78 if settings.get("fail_on_error") else 0
 
@@ -79,6 +95,7 @@ def main() -> int:
     set_output("findings_json", findings_json)
     set_output("exit_code", str(exit_code))
     set_output("diff_truncated", str(context.truncated).lower())
+    set_output("should_comment", "true")
     write_step_summary(rendered)
 
     if exit_code != 0 and settings.get("fail_on_error"):

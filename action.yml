@@ -42,6 +42,18 @@ inputs:
     description: "Head branch name for review context."
     required: false
     default: ""
+  pr-is-fork:
+    description: "Whether the pull request head repository is a fork. Pass github.event.pull_request.head.repo.fork when available."
+    required: false
+    default: ""
+  comment-author-association:
+    description: "GitHub author association for issue_comment slash commands."
+    required: false
+    default: ""
+  trusted-author-associations:
+    description: "Comma-separated author associations allowed to run issue_comment slash commands."
+    required: false
+    default: "OWNER,MEMBER,COLLABORATOR"
   commit-messages:
     description: "Newline-separated commit messages for review context."
     required: false
@@ -143,6 +155,9 @@ outputs:
   resolved-command:
     description: "Resolved command: review, ask, improve, or describe."
     value: ${{ steps.review.outputs.resolved_command }}
+  should-comment:
+    description: "Whether the action should publish a PR comment for this run."
+    value: ${{ steps.review.outputs.should_comment }}
   comment-url:
     description: "Created or updated PR comment URL."
     value: ${{ steps.comment.outputs.comment_url }}
@@ -167,6 +182,9 @@ runs:
         INPUT_PR_BODY: ${{ inputs.pr-body }}
         INPUT_BASE_REF: ${{ inputs.base-ref }}
         INPUT_HEAD_REF: ${{ inputs.head-ref }}
+        INPUT_PR_IS_FORK: ${{ inputs.pr-is-fork }}
+        INPUT_COMMENT_AUTHOR_ASSOCIATION: ${{ inputs.comment-author-association }}
+        INPUT_TRUSTED_AUTHOR_ASSOCIATIONS: ${{ inputs.trusted-author-associations }}
         INPUT_COMMIT_MESSAGES: ${{ inputs.commit-messages }}
         INPUT_EVENT_NAME: ${{ inputs.event-name }}
         INPUT_COMMENT_BODY: ${{ inputs.comment-body }}
@@ -189,7 +207,7 @@ runs:
 
     - name: Create or update PR comment
       id: comment
-      if: ${{ inputs.comment-mode != 'off' && inputs.pr-number != '' && inputs.github-token != '' }}
+      if: ${{ steps.review.outputs.should_comment != 'false' && inputs.comment-mode != 'off' && inputs.pr-number != '' && inputs.github-token != '' }}
       uses: actions/github-script@v7
       env:
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
