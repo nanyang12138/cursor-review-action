@@ -1,10 +1,12 @@
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from .localization import normalize_language
 
+
+CONFIG_SCHEMA_VERSION = "config/v1"
 
 DEFAULTS: Dict[str, Any] = {
     "command": "review",
@@ -45,6 +47,30 @@ DEFAULTS: Dict[str, Any] = {
     "trigger_phrase": "/cursor-review",
 }
 
+KNOWN_CONFIG_KEYS = set(DEFAULTS) | {
+    "persistent_comment",
+    "comment_mode",
+    "review",
+    "ask",
+    "improve",
+    "describe",
+}
+
+INT_SETTINGS: Dict[str, Tuple[int, int]] = {
+    "max_findings": (DEFAULTS["max_findings"], 0),
+    "max_diff_bytes": (DEFAULTS["max_diff_bytes"], 0),
+    "max_files": (DEFAULTS["max_files"], 0),
+    "max_hunks": (DEFAULTS["max_hunks"], 0),
+    "max_cursor_calls": (DEFAULTS["max_cursor_calls"], 1),
+    "timeout_seconds": (DEFAULTS["timeout_seconds"], 1),
+    "guidance_max_bytes": (DEFAULTS["guidance_max_bytes"], 0),
+    "guidance_max_lines": (DEFAULTS["guidance_max_lines"], 0),
+}
+
+BOOL_SETTINGS = {"guidance_enabled", "debug_artifacts", "fail_on_error", "fail_on_findings"}
+SUPPORTED_FILTER_MODES = {"added", "diff_context", "file"}
+SAFE_DIAGNOSTIC_VALUE_RE = re.compile(r"^[A-Za-z0-9 ._/@:+,*?=|-]{0,80}$")
+
 
 def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
@@ -61,6 +87,135 @@ def to_int(value: Any, default: int) -> int:
         return int(str(value).strip())
     except Exception:
         return default
+
+
+def _safe_value_preview(value: Any) -> str:
+    raw = str(value)
+    if SAFE_DIAGNOSTIC_VALUE_RE.fullmatch(raw):
+        return raw
+    return "<redacted>"
+
+
+def empty_config_diagnostics(path: Path) -> Dict[str, Any]:
+    return {
+        "schema_version": CONFIG_SCHEMA_VERSION,
+        "path": str(path),
+        "loaded": False,
+        "unknown_keys": [],
+        "invalid_values": [],
+        "warnings": [],
+        "fallback_count": 0,
+        "unknown_key_count": 0,
+    }
+
+
+def _add_config_warning(diagnostics: Dict[str, Any], warning: str) -> None:
+    diagnostics.setdefault("warnings", []).append(warning)
+
+
+def load_repo_config(path: Path) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    diagnostics = empty_config_diagnostics(path)
+    if not path.exists():
+        return {}, diagnostics
+
+    diagnostics["loaded"] = True
+    loaded = load_simple_yaml(path)
+    config: Dict[str, Any] = {}
+    for key, value in loaded.items():
+        if key in KNOWN_CONFIG_KEYS:
+            config[key] = value
+            continue
+        diagnostics["unknown_keys"].append({"key": key, "action": "ignored"})
+        _add_config_warning(diagnostics, f"Unknown config key `{key}` was ignored.")
+    diagnostics["unknown_key_count"] = len(diagnostics["unknown_keys"])
+    return config, diagnostics
+
+
+def _normalize_int_setting(settings: Dict[str, Any], diagnostics: Dict[str, Any], key: str) -> None:
+    default, minimum = INT_SETTINGS[key]
+    raw = settings.get(key)
+    try:
+        if isinstance(raw, bool):
+            raise ValueError("bool is not an integer setting")
+        parsed = int(str(raw).strip())
+    except Exception:
+        settings[key] = default
+        diagnostics["invalid_values"].append(
+            {
+                "key": key,
+                "value": _safe_value_preview(raw),
+                "reason": "invalid_integer",
+                "fallback": default,
+            }
+        )
+        _add_config_warning(diagnostics, f"Config `{key}` expected an integer; using `{default}`.")
+        return
+
+    if parsed < minimum:
+        settings[key] = minimum
+        diagnostics["invalid_values"].append(
+            {
+                "key": key,
+                "value": _safe_value_preview(raw),
+                "reason": "below_minimum",
+                "fallback": minimum,
+            }
+        )
+        _add_config_warning(diagnostics, f"Config `{key}` was below `{minimum}`; using `{minimum}`.")
+        return
+
+    settings[key] = parsed
+
+
+def _normalize_bool_setting(settings: Dict[str, Any], diagnostics: Dict[str, Any], key: str) -> None:
+    raw = settings.get(key)
+    if isinstance(raw, bool):
+        settings[key] = raw
+        return
+    normalized = str(raw).strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        settings[key] = True
+        return
+    if normalized in {"0", "false", "no", "n", "off"}:
+        settings[key] = False
+        return
+
+    fallback = bool(DEFAULTS.get(key, False))
+    settings[key] = fallback
+    diagnostics["invalid_values"].append(
+        {
+            "key": key,
+            "value": _safe_value_preview(raw),
+            "reason": "invalid_boolean",
+            "fallback": fallback,
+        }
+    )
+    _add_config_warning(diagnostics, f"Config `{key}` expected a boolean; using `{str(fallback).lower()}`.")
+
+
+def normalize_settings(settings: Dict[str, Any], diagnostics: Dict[str, Any]) -> None:
+    for key in INT_SETTINGS:
+        _normalize_int_setting(settings, diagnostics, key)
+    for key in BOOL_SETTINGS:
+        _normalize_bool_setting(settings, diagnostics, key)
+
+    filter_mode = str(settings.get("filter_mode", DEFAULTS["filter_mode"]) or "").strip().lower()
+    if filter_mode not in SUPPORTED_FILTER_MODES:
+        fallback = DEFAULTS["filter_mode"]
+        diagnostics["invalid_values"].append(
+            {
+                "key": "filter_mode",
+                "value": _safe_value_preview(settings.get("filter_mode")),
+                "reason": "unsupported_value",
+                "fallback": fallback,
+            }
+        )
+        _add_config_warning(diagnostics, f"Config `filter_mode` is unsupported; using `{fallback}`.")
+        settings["filter_mode"] = fallback
+    else:
+        settings["filter_mode"] = filter_mode
+
+    diagnostics["fallback_count"] = len(diagnostics["invalid_values"])
 
 
 def split_csv(value: Any) -> List[str]:
@@ -197,24 +352,14 @@ def load_settings() -> Dict[str, Any]:
     settings.update({key: value for key, value in input_map.items() if value != ""})
 
     config_path = Path(str(settings["config_path"]))
-    repo_config = load_simple_yaml(config_path)
+    repo_config, config_diagnostics = load_repo_config(config_path)
     settings.update(repo_config)
 
-    settings["max_findings"] = to_int(settings.get("max_findings"), DEFAULTS["max_findings"])
-    settings["max_diff_bytes"] = max(to_int(settings.get("max_diff_bytes"), DEFAULTS["max_diff_bytes"]), 0)
-    settings["max_files"] = max(to_int(settings.get("max_files"), DEFAULTS["max_files"]), 0)
-    settings["max_hunks"] = max(to_int(settings.get("max_hunks"), DEFAULTS["max_hunks"]), 0)
-    settings["max_cursor_calls"] = max(to_int(settings.get("max_cursor_calls"), DEFAULTS["max_cursor_calls"]), 1)
-    settings["timeout_seconds"] = max(to_int(settings.get("timeout_seconds"), DEFAULTS["timeout_seconds"]), 1)
-    settings["guidance_enabled"] = to_bool(settings.get("guidance_enabled"))
-    settings["guidance_max_bytes"] = max(to_int(settings.get("guidance_max_bytes"), DEFAULTS["guidance_max_bytes"]), 0)
-    settings["guidance_max_lines"] = max(to_int(settings.get("guidance_max_lines"), DEFAULTS["guidance_max_lines"]), 0)
-    settings["debug_artifacts"] = to_bool(settings.get("debug_artifacts"))
-    settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
-    settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
+    normalize_settings(settings, config_diagnostics)
     language_diagnostics = normalize_language(settings.get("language"))
     settings["language"] = language_diagnostics["effective_language"]
     settings["language_diagnostics"] = language_diagnostics
     settings["cursor_api_key_present"] = bool(env("CURSOR_API_KEY").strip())
     settings["config_loaded"] = str(config_path if config_path.exists() else "")
+    settings["config_diagnostics"] = config_diagnostics
     return settings

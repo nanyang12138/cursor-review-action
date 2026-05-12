@@ -6,7 +6,7 @@ parsing, and rendered diagnostics.
 
 Each concrete fixture must declare capability IDs so product parity claims can be
 traced back to repeatable evidence in `docs/parity-scorecard.md`. The harness
-currently has 10 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
+currently has 11 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
 volume gate while the `v1` target remains 20 fixtures. The review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
@@ -30,6 +30,12 @@ deterministic publish-decision behavior. The initial quality gate fixture is:
 
 - `unsupported_claim`: downgrades an unsupported external "tests passed" claim
   before it can be treated as a high-confidence review finding.
+
+Invalid config fixtures live under `tests/fixtures/config_invalid/*` and cover
+schema diagnostics plus safe fallback behavior before Cursor is contacted:
+
+- `bad_values`: unknown config keys are ignored, invalid numeric/boolean/filter
+  values fall back safely, and rendered diagnostics expose the warnings.
 
 The comparison protocol lives in `docs/parity-reports/` and uses these
 repository-owned fixtures as initial samples. The fixtures intentionally do not

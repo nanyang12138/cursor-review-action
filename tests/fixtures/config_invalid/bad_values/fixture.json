@@ -1,0 +1,39 @@
+{
+  "name": "bad_values",
+  "capability_ids": [
+    "CONFIG-SCHEMA-P1",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "config_text": "max_findings: many\nmax_diff_bytes: -1\nmax_cursor_calls: 0\ntimeout_seconds: slow\nfilter_mode: entire_repo\ndebug_artifacts: maybe\nsurprise_option: true\n",
+  "expected": {
+    "loaded": true,
+    "unknown_keys": [
+      "surprise_option"
+    ],
+    "invalid_keys": [
+      "max_findings",
+      "max_diff_bytes",
+      "max_cursor_calls",
+      "timeout_seconds",
+      "debug_artifacts",
+      "filter_mode"
+    ],
+    "settings": {
+      "max_findings": 5,
+      "max_diff_bytes": 0,
+      "max_cursor_calls": 1,
+      "timeout_seconds": 600,
+      "debug_artifacts": false,
+      "filter_mode": "added"
+    },
+    "warnings_contain": [
+      "Unknown config key `surprise_option`",
+      "Config `max_findings` expected an integer",
+      "Config `max_diff_bytes` was below `0`",
+      "Config `max_cursor_calls` was below `1`",
+      "Config `timeout_seconds` expected an integer",
+      "Config `debug_artifacts` expected a boolean",
+      "Config `filter_mode` is unsupported"
+    ]
+  }
+}

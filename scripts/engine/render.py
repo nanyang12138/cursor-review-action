@@ -195,6 +195,14 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- CI policy reason: `{ci_policy.get('reason', 'unknown')}`")
         diagnostics.append(f"- CI gating eligible findings: `{ci_policy.get('gating_eligible_finding_count', ci_policy.get('finding_count', 0))}`")
         diagnostics.append(f"- CI high severity findings: `{ci_policy.get('high_severity_finding_count', 0)}`")
+    config_diagnostics = settings.get("config_diagnostics") or {}
+    if config_diagnostics:
+        diagnostics.append(f"- Config schema: `{config_diagnostics.get('schema_version', 'unknown')}`")
+        diagnostics.append(f"- Config loaded: `{str(config_diagnostics.get('loaded', False)).lower()}`")
+        diagnostics.append(f"- Config unknown keys: `{config_diagnostics.get('unknown_key_count', 0)}`")
+        diagnostics.append(f"- Config fallback count: `{config_diagnostics.get('fallback_count', 0)}`")
+        for warning in config_diagnostics.get("warnings") or []:
+            diagnostics.append(f"- Config warning: `{warning}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
     privacy = privacy_diagnostics(settings, redaction_summary)

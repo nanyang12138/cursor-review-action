@@ -268,6 +268,37 @@ guidance_max_bytes: 1024
         self.assertTrue(settings["language_diagnostics"]["fallback_used"])
         self.assertEqual(settings["language_diagnostics"]["reason"], "multiline_language_defaulted")
 
+    def test_invalid_config_fixture_reports_safe_fallbacks(self) -> None:
+        fixture_path = ROOT / "tests" / "fixtures" / "config_invalid" / "bad_values" / "fixture.json"
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / ".cursor-review.yml"
+            config_path.write_text(fixture["config_text"], encoding="utf-8")
+            with mock.patch.dict(os.environ, {"INPUT_CONFIG_PATH": str(config_path)}, clear=True):
+                settings = config.load_settings()
+
+        expected = fixture["expected"]
+        diagnostics = settings["config_diagnostics"]
+
+        self.assertEqual(diagnostics["schema_version"], config.CONFIG_SCHEMA_VERSION)
+        self.assertEqual(diagnostics["loaded"], expected["loaded"])
+        self.assertEqual(
+            [item["key"] for item in diagnostics["unknown_keys"]],
+            expected["unknown_keys"],
+        )
+        self.assertEqual(
+            [item["key"] for item in diagnostics["invalid_values"]],
+            expected["invalid_keys"],
+        )
+        for key, value in expected["settings"].items():
+            self.assertEqual(settings[key], value)
+        for snippet in expected["warnings_contain"]:
+            self.assertTrue(
+                any(snippet in warning for warning in diagnostics["warnings"]),
+                msg=f"missing config warning containing {snippet!r}",
+            )
+
 
 class CIPolicyTests(unittest.TestCase):
     def test_default_policy_does_not_fail_on_high_findings(self) -> None:
@@ -1248,6 +1279,38 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Language fallback used: `false`", rendered)
         self.assertNotIn("idioma", rendered.lower())
 
+    def test_render_comment_reports_config_diagnostics(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {
+                "resolved_command": "review",
+                "model": "auto",
+                "filter_mode": "added",
+                "config_diagnostics": {
+                    "schema_version": config.CONFIG_SCHEMA_VERSION,
+                    "loaded": True,
+                    "unknown_key_count": 1,
+                    "fallback_count": 2,
+                    "warnings": [
+                        "Unknown config key `surprise_option` was ignored.",
+                        "Config `max_findings` expected an integer; using `5`.",
+                    ],
+                },
+            },
+        )
+
+        self.assertIn("Config schema: `config/v1`", rendered)
+        self.assertIn("Config loaded: `true`", rendered)
+        self.assertIn("Config unknown keys: `1`", rendered)
+        self.assertIn("Config fallback count: `2`", rendered)
+        self.assertIn("Config warning: `Unknown config key `surprise_option` was ignored.`", rendered)
+
     def test_render_comment_reports_ci_policy_diagnostics(self) -> None:
         rendered = render.render_comment(
             "One issue.",
@@ -1629,6 +1692,20 @@ class FixtureRegressionTests(unittest.TestCase):
 
     def test_quality_gate_fixtures_have_capability_trace_files(self) -> None:
         fixture_root = ROOT / "tests" / "fixtures" / "quality_gate"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                capabilities_path = fixture_path.parent / "capabilities.txt"
+                self.assertTrue(capabilities_path.exists())
+                capabilities = [
+                    line.strip()
+                    for line in capabilities_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                self.assertEqual(capabilities, fixture["capability_ids"])
+
+    def test_config_invalid_fixtures_have_capability_trace_files(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "config_invalid"
         for fixture_path in fixtures.discover_fixture_paths(fixture_root):
             with self.subTest(fixture=fixture_path.parent.name):
                 fixture = fixtures.load_fixture(fixture_path)

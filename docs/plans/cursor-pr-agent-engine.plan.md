@@ -456,9 +456,9 @@ flowchart TD
 - Redaction failure 会阻止 raw comment publishing。
 - 当前未决问题全部已有默认决策，且记录在 `PR_AGENT_ENGINE_MAPPING.md` 的 `Resolved Open Questions` 与 Round K。
 - `v0.5` fixture gate 明确为 10 个 concrete fixtures，`v1` 目标为 20 个。
-- `v0.5` fixture volume gate 已由 10 个 no-Cursor concrete fixtures 覆盖；`v1`
-  仍需继续扩展到 20 个，优先补齐 invalid config、empty Cursor output 和
-  improve/repo-guidance 等剩余负向与命令案例。
+- `v0.5` fixture volume gate 已由 11 个 no-Cursor concrete fixtures 覆盖，其中
+  invalid config 负向夹具已验证 safe fallback diagnostics；`v1` 仍需继续扩展到
+  20 个，优先补齐 empty Cursor output、improve/repo-guidance 等剩余负向与命令案例。
 - `file_only`、deleted-only、partial review、untrusted command、quality gate output 都有默认渲染/诊断策略。
 - Release checklist 通过后才能打稳定 tag。
 - README 明确说明这是 clean-room Cursor-native PR Agent，不复制 PR-Agent 代码。

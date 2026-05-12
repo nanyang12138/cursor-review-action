@@ -273,6 +273,10 @@ Configuration precedence:
 slash command arguments > PR comment prompt > .cursor-review.yml > workflow inputs > action defaults
 ```
 
+Unknown `.cursor-review.yml` keys are ignored with diagnostics. Invalid numeric,
+boolean, or `filter_mode` values fall back to safe defaults before Cursor is
+contacted, and the review diagnostics list the affected keys.
+
 ## Common Customizations
 
 Change output language:
