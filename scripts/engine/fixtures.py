@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, List
 
 from .config import DEFAULTS
 from .diff_index import build_diff_index
+from .findings import postprocess_findings_json
 from .grounding import ground_findings_json
 from .parser import parse_agent_output_result
 from .prompts import build_prompt
@@ -58,10 +59,13 @@ def run_fixture(fixture: Dict[str, Any]) -> FixtureResult:
     parse_result = parse_agent_output_result(fixture.get("agent_output", ""), command)
     grounding_result = ground_findings_json(parse_result.findings_json, meta.get("diff_index") or {}, command)
     findings_json = grounding_result.findings_json
+    findings_result = postprocess_findings_json(findings_json, settings, command)
+    findings_json = findings_result.findings_json
     runner_diagnostics = dict(fixture.get("runner_diagnostics") or {})
     if parse_result.diagnostics:
         parser_diagnostics = dict(parse_result.diagnostics)
         parser_diagnostics["grounding"] = grounding_result.diagnostics
+        parser_diagnostics["findings"] = findings_result.diagnostics
         runner_diagnostics.setdefault("parser", parser_diagnostics)
     rendered = render_comment(
         parse_result.markdown,

@@ -136,6 +136,14 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
             diagnostics.append(f"- Grounding unanchored findings: `{grounding.get('unanchored_count', 0)}`")
             diagnostics.append(f"- Invalid anchor count: `{grounding.get('invalid_anchor_count', 0)}`")
             diagnostics.append(f"- Skipped-file finding count: `{grounding.get('skipped_file_finding_count', 0)}`")
+        findings = parser_diagnostics.get("findings") or {}
+        if findings:
+            diagnostics.append(f"- Finding dedup schema: `{findings.get('schema_version', 'unknown')}`")
+            diagnostics.append(f"- Finding dedup applied: `{str(findings.get('applied', False)).lower()}`")
+            diagnostics.append(f"- Finding input count: `{findings.get('input_count', 0)}`")
+            diagnostics.append(f"- Finding duplicate count: `{findings.get('duplicate_count', 0)}`")
+            diagnostics.append(f"- Finding capped count: `{findings.get('capped_count', 0)}`")
+            diagnostics.append(f"- Finding output count: `{findings.get('output_count', 0)}`")
         if parser_diagnostics.get("repair_skipped_reason"):
             diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
         if "repair_succeeded" in parser_diagnostics:

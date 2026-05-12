@@ -136,7 +136,7 @@ todos:
     status: completed
   - id: finding-dedup
     content: 对同轮 findings 做 normalization、fingerprint、dedup、severity/confidence/grounding 排序，再应用 max_findings 或 CI gating
-    status: pending
+    status: completed
   - id: trigger-trust-policy
     content: 建立 trigger policy matrix，在 context construction 和 Cursor call 前处理 fork PR、issue_comment author association、workflow_dispatch、rerun 和 untrusted trigger
     status: completed

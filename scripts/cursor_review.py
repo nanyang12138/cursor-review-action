@@ -9,6 +9,7 @@ from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
+from engine.findings import postprocess_findings_json
 from engine.grounding import ground_findings_json
 from engine.help import render_help
 from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
@@ -179,6 +180,9 @@ def main(argv: list[str] | None = None) -> int:
     grounding_result = ground_findings_json(findings_json, context.meta.get("diff_index") or {}, command)
     findings_json = grounding_result.findings_json
     parser_diagnostics["grounding"] = grounding_result.diagnostics
+    findings_result = postprocess_findings_json(findings_json, settings, command)
+    findings_json = findings_result.findings_json
+    parser_diagnostics["findings"] = findings_result.diagnostics
     runner_diagnostics["parser"] = parser_diagnostics
     ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
     runner_diagnostics["ci_policy"] = ci_policy

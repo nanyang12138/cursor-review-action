@@ -18,6 +18,8 @@ review harness covers:
 - `describe_summary`: command-specific describe schema and comment-only summary.
 - `invalid_finding_anchor`: selected-diff grounding fixture that keeps an
   anchored finding while downgrading a skipped-file finding.
+- `duplicate_findings`: same-run deduplication fixture that collapses duplicate
+  same-line findings before applying `max_findings`.
 
 The comparison protocol lives in `docs/parity-reports/` and uses these
 repository-owned fixtures as initial samples. The fixtures intentionally do not

@@ -1,0 +1,60 @@
+{
+  "name": "duplicate_findings",
+  "capability_ids": [
+    "FINDING-DEDUP-P0",
+    "FINDING-GROUNDING-P0",
+    "FINDING-TAXONOMY-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "correctness",
+    "max_findings": 2
+  },
+  "context": {
+    "diff_text": "diff --git a/src/app.py b/src/app.py\n@@ -10,3 +10,4 @@ def handle(value):\n     parsed = parse(value)\n+    return parsed[\"name\"].lower()\n     return \"\"\ndiff --git a/src/security.py b/src/security.py\n@@ -1,2 +1,3 @@\n TOKEN = os.environ.get(\"TOKEN\")\n+print(TOKEN)\n",
+    "stat": " src/app.py | 1 +\n src/security.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/app.py",
+        "src/security.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/app.py",
+          "bytes": 142,
+          "hunks": 1,
+          "status": "included"
+        },
+        {
+          "path": "src/security.py",
+          "bytes": 91,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": []
+    }
+  },
+  "agent_output": "<review_markdown>Returned duplicate app findings plus a higher severity security finding.</review_markdown>\n<findings_json>[{\"severity\":\"medium\",\"confidence\":\"high\",\"category\":\"bug\",\"file\":\"src/app.py\",\"line\":11,\"title\":\"Guard parsed name before lowercasing\",\"body\":\"The parsed payload may not include name, causing a runtime failure.\",\"suggestion\":\"Check the key exists before lowercasing.\",\"evidence\":\"return parsed[\\\"name\\\"].lower()\"},{\"severity\":\"medium\",\"confidence\":\"medium\",\"category\":\"bug\",\"file\":\"src/app.py\",\"line\":11,\"title\":\"Parsed name can be missing\",\"body\":\"This repeats the same file and line concern with different wording.\",\"suggestion\":\"Validate parsed before indexing.\",\"evidence\":\"return parsed[\\\"name\\\"].lower()\"},{\"severity\":\"high\",\"confidence\":\"high\",\"category\":\"security\",\"file\":\"src/security.py\",\"line\":2,\"title\":\"Do not print secret tokens\",\"body\":\"Printing token-like values can leak secrets to logs.\",\"suggestion\":\"Remove the print or emit a redacted diagnostic.\",\"evidence\":\"print(TOKEN)\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 2,
+    "rendered_contains": [
+      "Finding dedup schema: `finding-dedup/v1`",
+      "Finding duplicate count: `1`",
+      "Finding capped count: `0`",
+      "Finding output count: `2`"
+    ],
+    "findings_json_contains": [
+      "\"file\": \"src/security.py\"",
+      "\"file\": \"src/app.py\"",
+      "\"finding_fingerprint\":"
+    ]
+  }
+}

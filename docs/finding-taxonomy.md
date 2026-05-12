@@ -38,8 +38,25 @@ When the model returns one of these categories in review output, the parser:
 Future output-quality-gate work can use these deterministic fields to suppress
 or reroute noisy findings before publishing.
 
+## Same-run deduplication
+
+`FINDING-DEDUP-P0` runs after taxonomy normalization and selected-diff
+grounding. The post-processing pass:
+
+1. computes a stable `finding_fingerprint` from normalized path, category,
+   line side, changed line, hunk signature, title, and evidence hash,
+2. collapses duplicate same-run findings before `max_findings` is applied,
+3. sorts retained findings by severity, confidence, grounding quality, and
+   actionability, and
+4. records counts for input, duplicates, cap suppression, output, and already
+   suppressed findings.
+
+The diagnostics expose counts and schema versions only. They do not include raw
+prompt text, raw diff text, or full evidence bodies.
+
 ## Diagnostics
 
 Rendered diagnostics include taxonomy schema version, whether taxonomy was
 applied, normalized finding count, defaulted/invalid category counts,
-invalid severity/confidence counts, and noise-suppressed count.
+invalid severity/confidence counts, noise-suppressed count, deduplication
+schema, duplicate count, cap count, and output count.

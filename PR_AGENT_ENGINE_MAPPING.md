@@ -1088,6 +1088,19 @@ Validation checklist:
 - Low-confidence unanchored findings do not displace high-confidence anchored findings.
 - Suppression diagnostics show counts without exposing raw prompt or raw diff.
 
+Implementation evidence:
+
+- `scripts/engine/findings.py` computes stable same-run fingerprints, removes
+  duplicate review findings, sorts retained findings by severity, confidence,
+  grounding quality, and actionability, then applies `max_findings`.
+- Live, local dry-run, and fixture paths run finding post-processing after
+  selected-diff grounding and before CI policy evaluation or rendering.
+- `tests/test_engine.py::FindingDedupTests` covers duplicate collapse,
+  severity/grounding ordering, and cap behavior; `tests/fixtures/pr_regression/duplicate_findings`
+  adds no-Cursor regression coverage.
+- `docs/finding-taxonomy.md` documents same-run deduplication diagnostics and
+  the no-raw-prompt/no-raw-diff logging boundary.
+
 ### Output Quality Gate and Self-Reflection Boundary
 
 PR-Agent behavior to learn from:

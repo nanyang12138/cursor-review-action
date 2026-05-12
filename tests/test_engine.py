@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, fixtures, grounding, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -693,6 +693,90 @@ class FindingGroundingTests(unittest.TestCase):
         self.assertEqual(decision["gating_eligible_finding_count"], 1)
         self.assertEqual(decision["high_severity_finding_count"], 1)
         self.assertEqual(decision["highest_severity"], "high")
+
+
+class FindingDedupTests(unittest.TestCase):
+    def test_deduplicates_same_file_line_before_applying_max_findings(self) -> None:
+        payload = [
+            {
+                "file": "src/app.py",
+                "line": 12,
+                "category": "bug",
+                "severity": "medium",
+                "confidence": "medium",
+                "grounding_status": "anchored",
+                "title": "Duplicate wording A",
+                "body": "Same actionable issue.",
+            },
+            {
+                "file": "src/app.py",
+                "line": 12,
+                "category": "bug",
+                "severity": "medium",
+                "confidence": "medium",
+                "grounding_status": "anchored",
+                "title": "Duplicate wording B",
+                "body": "Same actionable issue with different text.",
+            },
+            {
+                "file": "src/critical.py",
+                "line": 3,
+                "category": "security",
+                "severity": "critical",
+                "confidence": "high",
+                "grounding_status": "anchored",
+                "title": "Keep the critical issue",
+                "body": "This should sort ahead of medium findings.",
+            },
+        ]
+
+        result = findings.postprocess_findings_json(json.dumps(payload), {"max_findings": 2}, "review")
+        processed = json.loads(result.findings_json)
+
+        self.assertEqual(result.diagnostics["schema_version"], findings.FINDING_DEDUP_SCHEMA_VERSION)
+        self.assertEqual(result.diagnostics["input_count"], 3)
+        self.assertEqual(result.diagnostics["duplicate_count"], 1)
+        self.assertEqual(result.diagnostics["capped_count"], 0)
+        self.assertEqual(result.diagnostics["output_count"], 2)
+        self.assertEqual([item["file"] for item in processed], ["src/critical.py", "src/app.py"])
+        self.assertTrue(all(item.get("finding_fingerprint") for item in processed))
+
+    def test_low_confidence_unanchored_findings_do_not_displace_grounded_findings(self) -> None:
+        payload = [
+            {
+                "file": "",
+                "category": "security",
+                "severity": "critical",
+                "confidence": "low",
+                "grounding_status": "unanchored",
+                "suppressed": True,
+                "title": "Ungrounded broad claim",
+            },
+            {
+                "file": "src/app.py",
+                "line": 8,
+                "category": "bug",
+                "severity": "high",
+                "confidence": "high",
+                "grounding_status": "anchored",
+                "title": "Grounded bug",
+            },
+            {
+                "file": "src/other.py",
+                "line": 9,
+                "category": "test_gap",
+                "severity": "medium",
+                "confidence": "high",
+                "grounding_status": "anchored",
+                "title": "Grounded test gap",
+            },
+        ]
+
+        result = findings.postprocess_findings_json(json.dumps(payload), {"max_findings": 2}, "review")
+        processed = json.loads(result.findings_json)
+
+        self.assertEqual(result.diagnostics["capped_count"], 1)
+        self.assertEqual([item["title"] for item in processed], ["Grounded bug", "Grounded test gap"])
 
 
 class PromptParserRenderTests(unittest.TestCase):
