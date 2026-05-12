@@ -233,8 +233,7 @@ the action without inheriting every PR-Agent feature:
 - Stable repo config keys include `model`, `language`, `review_focus`,
   `max_findings`, `max_diff_bytes`, `filter_mode`, `include_patterns`,
   `exclude_patterns`, `persistent_comment`, `enabled_commands`,
-  `guidance_files`, `strict_args`, `timeout_seconds`, `fail_on_error`, and
-  `fail_on_findings`.
+  `guidance_files`, `timeout_seconds`, `fail_on_error`, and `fail_on_findings`.
 - `/cursor-review` is the default stable command. `/cursor-ask`,
   `/cursor-improve`, and `/cursor-describe` are available through explicit
   command enablement while their UX continues to be validated.
@@ -283,6 +282,9 @@ This file is different from `.github/workflows/cursor-review.yml`.
 - `.cursor-review.yml` is optional. It customizes how the action reviews PRs in this repository.
 
 You can skip `.cursor-review.yml` if the default settings are enough.
+The repository includes `.cursor-review.schema.json` as an advisory editor and
+maintainer schema for these repo-local keys; workflow event metadata such as PR
+title, body, SHAs, and tokens remains in action inputs.
 
 ```yaml
 model: auto

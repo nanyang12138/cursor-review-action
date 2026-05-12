@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/nanyang12138/cursor-review-action/main/.cursor-review.schema.json",
+  "title": "Cursor Review Action repository configuration",
+  "description": "Schema for .cursor-review.yml repository configuration. Workflow event metadata stays in action inputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "csvOrStringArray": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "pathMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "properties": {
+        "general": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ask": {
+          "type": "string",
+          "minLength": 1
+        },
+        "improve": {
+          "type": "string",
+          "minLength": 1
+        },
+        "describe": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional editor schema reference."
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "default": "auto"
+    },
+    "language": {
+      "type": "string",
+      "minLength": 1,
+      "default": "zh-CN"
+    },
+    "review_focus": {
+      "$ref": "#/$defs/csvOrStringArray",
+      "default": "correctness,security,performance,tests,edge-cases"
+    },
+    "max_findings": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 5
+    },
+    "max_diff_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 120000
+    },
+    "max_files": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_hunks": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_cursor_calls": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 600
+    },
+    "filter_mode": {
+      "type": "string",
+      "enum": [
+        "added",
+        "diff_context",
+        "file"
+      ],
+      "default": "added"
+    },
+    "include_patterns": {
+      "$ref": "#/$defs/csvOrStringArray"
+    },
+    "exclude_patterns": {
+      "$ref": "#/$defs/csvOrStringArray"
+    },
+    "skip_generated_files": {
+      "type": "boolean",
+      "default": true
+    },
+    "scope_mode": {
+      "type": "string",
+      "enum": [
+        "full",
+        "files"
+      ],
+      "default": "full"
+    },
+    "scope_files": {
+      "$ref": "#/$defs/csvOrStringArray"
+    },
+    "enabled_commands": {
+      "$ref": "#/$defs/csvOrStringArray",
+      "default": "review"
+    },
+    "trusted_author_associations": {
+      "$ref": "#/$defs/csvOrStringArray",
+      "default": "OWNER,MEMBER,COLLABORATOR"
+    },
+    "trigger_phrase": {
+      "type": "string",
+      "default": "/cursor-review"
+    },
+    "persistent_comment": {
+      "type": "boolean",
+      "default": true
+    },
+    "comment_mode": {
+      "type": "string",
+      "enum": [
+        "update",
+        "create",
+        "off"
+      ],
+      "default": "update"
+    },
+    "guidance_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "guidance_files": {
+      "$ref": "#/$defs/pathMap"
+    },
+    "guidance_max_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 20000
+    },
+    "guidance_max_lines": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 400
+    },
+    "metadata_cache_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "metadata_cache_max_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 10000
+    },
+    "debug_artifacts": {
+      "type": "boolean",
+      "default": false
+    },
+    "fail_on_error": {
+      "type": "boolean",
+      "default": false
+    },
+    "fail_on_findings": {
+      "type": "boolean",
+      "default": false,
+      "description": "Reserved diagnostic-only setting until severity-threshold gating is promoted."
+    }
+  }
+}

@@ -2139,9 +2139,7 @@ Stable config keys:
 - `persistent_comment`
 - `enabled_commands`
 - `guidance_files`
-- `strict_args`
 - `timeout_seconds`
-- `language`
 - `fail_on_error`
 - `fail_on_findings`
 
@@ -2206,6 +2204,21 @@ Suggested files:
 - `.cursor-review.schema.json`
 - `scripts/engine/config_schema.py`
 - `tests/fixtures/config_invalid/`
+
+Implementation evidence:
+
+- `.cursor-review.schema.json` documents the stable repo-local
+  `.cursor-review.yml` surface with typed keys, integer minimums, supported
+  `filter_mode`, `scope_mode`, and `comment_mode` values, and explicit guidance
+  and metadata-cache budget fields.
+- `scripts/engine/config.py` continues to enforce runtime-safe loading with
+  `config/v1` diagnostics, unknown-key warnings, invalid-value fallback counts,
+  and redacted previews before Cursor is contacted.
+- `docs/config-migration.md` records the schema scope, workflow-input boundary,
+  and maintainer checklist for future config changes.
+- `tests/test_engine.py::ConfigSchemaDocumentationTests` verifies the schema is
+  valid JSON, covers the documented stable README config keys, and matches
+  runtime defaults and constraints for `CONFIG-SCHEMA-P1`.
 
 Schema principles:
 
@@ -2510,7 +2523,8 @@ Allowed examples:
 --comment-only
 ```
 
-Unknown args warn or fail according to `strict_args`.
+Unknown args warn and remain in the user prompt; strict failure mode is not part
+of the current stable repo config surface.
 
 ### Cursor CLI Timeout
 

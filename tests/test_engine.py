@@ -380,6 +380,98 @@ guidance_max_bytes: 1024
             )
 
 
+class ConfigSchemaDocumentationTests(unittest.TestCase):
+    def _load_schema(self) -> dict:
+        return json.loads((ROOT / ".cursor-review.schema.json").read_text(encoding="utf-8"))
+
+    def test_repo_config_schema_is_valid_json_and_covers_stable_keys(self) -> None:
+        schema = self._load_schema()
+        properties = schema["properties"]
+
+        self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
+        self.assertFalse(schema["additionalProperties"])
+        for key in [
+            "model",
+            "language",
+            "review_focus",
+            "max_findings",
+            "max_diff_bytes",
+            "filter_mode",
+            "include_patterns",
+            "exclude_patterns",
+            "persistent_comment",
+            "enabled_commands",
+            "guidance_files",
+            "timeout_seconds",
+            "fail_on_error",
+            "fail_on_findings",
+        ]:
+            with self.subTest(key=key):
+                self.assertIn(key, properties)
+
+    def test_repo_config_schema_matches_runtime_defaults_and_constraints(self) -> None:
+        schema = self._load_schema()
+        properties = schema["properties"]
+
+        for key in [
+            "model",
+            "language",
+            "review_focus",
+            "max_findings",
+            "max_diff_bytes",
+            "max_files",
+            "max_hunks",
+            "max_cursor_calls",
+            "timeout_seconds",
+            "filter_mode",
+            "skip_generated_files",
+            "scope_mode",
+            "enabled_commands",
+            "trusted_author_associations",
+            "trigger_phrase",
+            "guidance_enabled",
+            "guidance_files",
+            "guidance_max_bytes",
+            "guidance_max_lines",
+            "metadata_cache_enabled",
+            "metadata_cache_max_bytes",
+            "debug_artifacts",
+            "fail_on_error",
+            "fail_on_findings",
+        ]:
+            with self.subTest(default=key):
+                if key == "guidance_files":
+                    continue
+                self.assertEqual(properties[key]["default"], config.DEFAULTS[key])
+
+        self.assertEqual(set(properties["filter_mode"]["enum"]), config.SUPPORTED_FILTER_MODES)
+        for key, (_default, minimum) in config.INT_SETTINGS.items():
+            with self.subTest(integer=key):
+                self.assertEqual(properties[key]["type"], "integer")
+                self.assertEqual(properties[key]["minimum"], minimum)
+        for key in config.BOOL_SETTINGS:
+            with self.subTest(boolean=key):
+                self.assertEqual(properties[key]["type"], "boolean")
+
+    def test_repo_config_schema_excludes_workflow_only_metadata_inputs(self) -> None:
+        properties = self._load_schema()["properties"]
+
+        for key in [
+            "base_sha",
+            "head_sha",
+            "pr_number",
+            "pr_title",
+            "pr_body",
+            "commit_messages",
+            "comment_body",
+            "cursor_api_key",
+            "github_token",
+            "metadata_cache_comment",
+        ]:
+            with self.subTest(key=key):
+                self.assertNotIn(key, properties)
+
+
 class CIPolicyTests(unittest.TestCase):
     def test_default_policy_does_not_fail_on_high_findings(self) -> None:
         decision = ci_policy.evaluate_ci_policy(

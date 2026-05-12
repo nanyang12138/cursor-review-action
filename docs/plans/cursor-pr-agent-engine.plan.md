@@ -469,6 +469,10 @@ flowchart TD
 - Metadata cache P1 已实现为 describe comment hidden marker：review/improve 仅在
   schema、source command、output schema、head SHA、启用状态和大小预算全部通过时复用，
   缺失、过期、禁用或无效缓存都会安全回退到当前 PR context。
+- `CONFIG-SCHEMA-P1` 已补齐 `.cursor-review.schema.json`，覆盖稳定 repo-local
+  配置键、预算字段、枚举值和 guidance/metadata-cache 边界；workflow-only
+  PR metadata 仍保留在 action inputs 中，运行时继续通过 `config/v1`
+  diagnostics 处理 unknown keys 与 safe fallbacks。
 - `docs/non-goals.md` 已记录 `NON-GOALS-P0` 与 `DEFERRED-FEATURES-P1`，
   明确 GitHub App、多平台、auto-fix、inline comments、labels、ticket
   integration、默认 PR body mutation、multi-call chunking、second critique、
