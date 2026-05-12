@@ -139,7 +139,7 @@ todos:
     status: pending
   - id: trigger-trust-policy
     content: 建立 trigger policy matrix，在 context construction 和 Cursor call 前处理 fork PR、issue_comment author association、workflow_dispatch、rerun 和 untrusted trigger
-    status: pending
+    status: completed
   - id: output-quality-gate
     content: 在 render/publish 前统一执行 schema、grounding、taxonomy、confidence、dedup、redaction、unsupported-claim 质量门禁并产出 publish decision
     status: pending

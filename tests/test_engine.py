@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, parser, prompts, render, runner  # noqa: E402
+from engine import command_args, commands, config, context, parser, prompts, render, runner, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -105,7 +105,11 @@ exclude_patterns: ["dist/**", "*.lock"]
             "INPUT_PR_BODY": "Implements parser guardrails.",
             "INPUT_BASE_REF": "main",
             "INPUT_HEAD_REF": "feature/parser",
+            "INPUT_PR_IS_FORK": "false",
+            "INPUT_COMMENT_AUTHOR_ASSOCIATION": "MEMBER",
+            "INPUT_TRUSTED_AUTHOR_ASSOCIATIONS": "OWNER,MEMBER",
             "INPUT_COMMIT_MESSAGES": "Add parser\nAdd tests",
+            "CURSOR_API_KEY": "test-key",
         }
 
         with mock.patch.dict(os.environ, env, clear=True):
@@ -115,6 +119,10 @@ exclude_patterns: ["dist/**", "*.lock"]
         self.assertEqual(settings["pr_body"], "Implements parser guardrails.")
         self.assertEqual(settings["base_ref"], "main")
         self.assertEqual(settings["head_ref"], "feature/parser")
+        self.assertEqual(settings["pr_is_fork"], "false")
+        self.assertEqual(settings["comment_author_association"], "MEMBER")
+        self.assertEqual(settings["trusted_author_associations"], "OWNER,MEMBER")
+        self.assertTrue(settings["cursor_api_key_present"])
         self.assertEqual(settings["commit_messages"], "Add parser\nAdd tests")
 
 
@@ -282,6 +290,92 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Commit messages provided: `1`", rendered)
         self.assertNotIn("Sensitive body", rendered)
 
+    def test_render_trigger_skip_reports_policy_without_raw_prompt(self) -> None:
+        rendered = render.render_trigger_skip(
+            {
+                "reason": "untrusted_author_association",
+                "trust_level": "untrusted",
+                "event_name": "issue_comment",
+                "command_prompt_source": "slash_command",
+                "comment_author_association": "CONTRIBUTOR",
+                "pr_is_fork": False,
+                "cursor_api_key_present": True,
+            },
+            {"resolved_command": "review"},
+        )
+
+        self.assertIn("Cursor review skipped before contacting Cursor.", rendered)
+        self.assertIn("untrusted_author_association", rendered)
+        self.assertNotIn("/cursor-review", rendered)
+
+
+class TriggerTrustPolicyTests(unittest.TestCase):
+    def test_trigger_fixture_decisions_match_expected_policy(self) -> None:
+        fixture_dir = ROOT / "tests" / "fixtures" / "triggers"
+        for fixture_path in sorted(fixture_dir.glob("*.json")):
+            with self.subTest(fixture=fixture_path.name):
+                fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+                decision = trust_policy.evaluate_trigger_trust(fixture["settings"])
+                expected = fixture["expected"]
+
+                self.assertEqual(decision.allowed, expected["allowed"])
+                self.assertEqual(decision.reason, expected["reason"])
+                self.assertEqual(decision.should_comment, expected["should_comment"])
+
+    def test_same_repo_pull_request_with_secret_is_allowed(self) -> None:
+        decision = trust_policy.evaluate_trigger_trust(
+            {
+                "event_name": "pull_request",
+                "pr_is_fork": "false",
+                "cursor_api_key_present": True,
+            }
+        )
+
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.reason, "pull_request_with_secret")
+        self.assertTrue(decision.should_comment)
+
+    def test_fork_pull_request_without_secret_is_skipped(self) -> None:
+        decision = trust_policy.evaluate_trigger_trust(
+            {
+                "event_name": "pull_request",
+                "pr_is_fork": "true",
+                "cursor_api_key_present": False,
+            }
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "fork_pull_request_without_secret")
+        self.assertFalse(decision.should_comment)
+
+    def test_issue_comment_requires_trusted_author_association(self) -> None:
+        decision = trust_policy.evaluate_trigger_trust(
+            {
+                "event_name": "issue_comment",
+                "command_prompt_source": "slash_command",
+                "comment_author_association": "CONTRIBUTOR",
+                "trusted_author_associations": "OWNER,MEMBER,COLLABORATOR",
+                "cursor_api_key_present": True,
+            }
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "untrusted_author_association")
+        self.assertFalse(decision.should_comment)
+
+    def test_issue_comment_allows_default_trusted_association(self) -> None:
+        decision = trust_policy.evaluate_trigger_trust(
+            {
+                "event_name": "issue_comment",
+                "command_prompt_source": "slash_command",
+                "comment_author_association": "COLLABORATOR",
+                "cursor_api_key_present": True,
+            }
+        )
+
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.reason, "trusted_issue_comment_command")
+
 
 class RunnerContractTests(unittest.TestCase):
     def test_run_cursor_result_records_success_contract(self) -> None:
@@ -373,6 +467,9 @@ class EntrypointTests(unittest.TestCase):
                 "INPUT_ENABLED_COMMANDS": "review",
                 "INPUT_COMMENT_BODY": "/cursor-review --focus=security,tests --max-findings=2\nCheck auth.",
                 "INPUT_CONFIG_PATH": str(Path(tmp) / "missing.yml"),
+                "INPUT_EVENT_NAME": "issue_comment",
+                "INPUT_COMMENT_AUTHOR_ASSOCIATION": "MEMBER",
+                "CURSOR_API_KEY": "test-key",
                 "GITHUB_OUTPUT": str(Path(tmp) / "outputs.txt"),
                 "GITHUB_STEP_SUMMARY": str(Path(tmp) / "summary.md"),
             }
@@ -394,6 +491,38 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("Maximum findings: 2.", prompt)
             self.assertIn("Review focus: security, tests.", prompt)
             self.assertIn("Check auth.", prompt)
+
+    def test_main_skips_untrusted_issue_comment_before_cursor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "INPUT_COMMAND": "review",
+                "INPUT_ENABLED_COMMANDS": "review",
+                "INPUT_COMMENT_BODY": "/cursor-review please run",
+                "INPUT_CONFIG_PATH": str(Path(tmp) / "missing.yml"),
+                "INPUT_EVENT_NAME": "issue_comment",
+                "INPUT_COMMENT_AUTHOR_ASSOCIATION": "CONTRIBUTOR",
+                "CURSOR_API_KEY": "test-key",
+                "GITHUB_OUTPUT": str(Path(tmp) / "outputs.txt"),
+                "GITHUB_STEP_SUMMARY": str(Path(tmp) / "summary.md"),
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch.object(cursor_review, "build_review_context") as build_context:
+                    with mock.patch.object(cursor_review, "run_cursor_result") as run_cursor:
+                        cwd = os.getcwd()
+                        os.chdir(tmp)
+                        try:
+                            exit_code = cursor_review.main()
+                        finally:
+                            os.chdir(cwd)
+
+            self.assertEqual(exit_code, 0)
+            build_context.assert_not_called()
+            run_cursor.assert_not_called()
+            rendered = (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8")
+            outputs = (Path(tmp) / "outputs.txt").read_text(encoding="utf-8")
+            self.assertIn("untrusted_author_association", rendered)
+            self.assertIn("should_comment<<", outputs)
+            self.assertIn("false", outputs)
 
 
 if __name__ == "__main__":

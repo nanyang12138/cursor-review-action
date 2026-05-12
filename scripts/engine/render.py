@@ -2,6 +2,31 @@ import os
 from typing import Any, Dict, Optional
 
 
+def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str, Any]) -> str:
+    diagnostics = [
+        f"- Command: `{settings.get('resolved_command')}`",
+        "- Trigger decision: `skipped`",
+        f"- Trigger reason: `{trigger_diagnostics.get('reason', 'unknown')}`",
+        f"- Trigger trust level: `{trigger_diagnostics.get('trust_level', 'unknown')}`",
+        f"- Event name: `{trigger_diagnostics.get('event_name', 'unknown')}`",
+        f"- Command source: `{trigger_diagnostics.get('command_prompt_source', 'unknown')}`",
+        f"- Comment author association: `{trigger_diagnostics.get('comment_author_association', 'unknown')}`",
+        f"- PR is fork: `{str(trigger_diagnostics.get('pr_is_fork', False)).lower()}`",
+        f"- Cursor API key present: `{str(trigger_diagnostics.get('cursor_api_key_present', False)).lower()}`",
+    ]
+    return f"""Cursor review skipped before contacting Cursor.
+
+Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
+
+<details>
+<summary>Cursor Review Diagnostics</summary>
+
+{chr(10).join(diagnostics)}
+
+</details>
+"""
+
+
 def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: str, truncated: bool, parsed_ok: bool, meta: Dict[str, Any], settings: Dict[str, Any], runner_diagnostics: Optional[Dict[str, Any]] = None) -> str:
     runner_diagnostics = runner_diagnostics or {}
     diagnostics = [
@@ -20,6 +45,10 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Command args applied: `{', '.join(settings.get('command_arg_keys', []))}`")
     for warning in settings.get("command_arg_warnings", []):
         diagnostics.append(f"- Command args warning: `{warning}`")
+    trigger_trust = settings.get("trigger_trust") or {}
+    if trigger_trust:
+        diagnostics.append(f"- Trigger trust level: `{trigger_trust.get('trust_level', 'unknown')}`")
+        diagnostics.append(f"- Trigger reason: `{trigger_trust.get('reason', 'unknown')}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
     diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")
