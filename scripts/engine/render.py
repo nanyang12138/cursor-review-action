@@ -30,6 +30,18 @@ def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
     return diagnostics
 
 
+def _localization_diagnostics(settings: Dict[str, Any]) -> List[str]:
+    localization = settings.get("language_diagnostics") or {}
+    if not localization:
+        return [f"- Language: `{settings.get('language', 'unknown')}`"]
+    return [
+        f"- Localization schema: `{localization.get('schema_version', 'unknown')}`",
+        f"- Language: `{localization.get('effective_language', settings.get('language', 'unknown'))}`",
+        f"- Language fallback used: `{str(localization.get('fallback_used', False)).lower()}`",
+        f"- Language reason: `{localization.get('reason', 'unknown')}`",
+    ]
+
+
 def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str, Any]) -> str:
     diagnostics = [
         f"- Command: `{settings.get('resolved_command')}`",
@@ -42,6 +54,7 @@ def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str,
         f"- PR is fork: `{str(trigger_diagnostics.get('pr_is_fork', False)).lower()}`",
         f"- Cursor API key present: `{str(trigger_diagnostics.get('cursor_api_key_present', False)).lower()}`",
     ]
+    diagnostics.extend(_localization_diagnostics(settings))
     diagnostics.extend(_run_state_diagnostics(settings))
     return f"""Cursor review skipped before contacting Cursor.
 
@@ -68,6 +81,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         "- Human decision required: `true`",
         f"- Prompt template version: `{settings.get('prompt_template_version', 'unknown')}`",
         f"- Model: `{settings.get('model')}`",
+        *_localization_diagnostics(settings),
         f"- Runner: `{runner_diagnostics.get('runner', 'cursor_cli')}`",
         f"- Cursor contacted: `{str(runner_diagnostics.get('cursor_contacted', True)).lower()}`",
         f"- Runner failure kind: `{runner_diagnostics.get('failure_kind', 'none')}`",

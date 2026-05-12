@@ -57,6 +57,7 @@ def render_help(settings: Dict[str, Any]) -> str:
     aliases = ", ".join(f"`{alias}`" for alias in HELP_ALIASES)
     config_path = str(settings.get("config_path") or ".cursor-review.yml")
     trigger_source = str(settings.get("command_prompt_source") or "unknown")
+    language = str(settings.get("language") or "zh-CN")
 
     return f"""# Cursor Review Action Help
 
@@ -98,6 +99,7 @@ Unknown arguments are treated as prompt text and are never executed as shell.
 - Command: `help`
 - Command source: `{trigger_source}`
 - Enabled commands: `{", ".join(enabled) or "none"}`
+- Language: `{language}`
 - Cursor contacted: `false`
 
 </details>

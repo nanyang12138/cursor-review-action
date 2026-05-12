@@ -279,8 +279,16 @@ Change output language:
 
 ```yaml
 with:
+  language: zh-CN
+```
+
+```yaml
+with:
   language: en
 ```
+
+`language` changes human-readable review prose only. JSON schema keys, action
+outputs, and diagnostics remain stable; see `docs/localization.md`.
 
 Use a specific model:
 

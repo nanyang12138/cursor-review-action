@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List
 
+from .localization import normalize_language
+
 
 DEFAULTS: Dict[str, Any] = {
     "command": "review",
@@ -207,6 +209,9 @@ def load_settings() -> Dict[str, Any]:
     settings["guidance_max_lines"] = max(to_int(settings.get("guidance_max_lines"), DEFAULTS["guidance_max_lines"]), 0)
     settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
     settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
+    language_diagnostics = normalize_language(settings.get("language"))
+    settings["language"] = language_diagnostics["effective_language"]
+    settings["language_diagnostics"] = language_diagnostics
     settings["cursor_api_key_present"] = bool(env("CURSOR_API_KEY").strip())
     settings["config_loaded"] = str(config_path if config_path.exists() else "")
     return settings

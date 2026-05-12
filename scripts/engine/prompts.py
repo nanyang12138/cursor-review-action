@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from .config import split_csv
 from .guidance import format_guidance_for_prompt
+from .localization import language_instruction
 from .schemas import schema_text
 
 
@@ -39,7 +40,7 @@ def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any
     }
     for placeholder, value in replacements.items():
         template = template.replace(placeholder, value)
-    return template.strip() + "\n"
+    return template.strip() + "\n\n" + language_instruction(language) + "\n"
 
 
 def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, truncated: bool, meta: Dict[str, Any], settings: Dict[str, Any]) -> str:
