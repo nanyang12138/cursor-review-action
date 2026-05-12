@@ -233,6 +233,9 @@ runs:
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         REVIEW_BODY: ${{ steps.review.outputs.summary }}
         RESOLVED_COMMAND: ${{ steps.review.outputs.resolved_command }}
+        COMMENT_MARKER: ${{ steps.review.outputs.comment_marker }}
+        COMMENT_TITLE: ${{ steps.review.outputs.comment_title }}
+        RUN_METADATA_COMMENT: ${{ steps.review.outputs.run_metadata_comment }}
         PR_NUMBER: ${{ inputs.pr-number }}
         PERSISTENT_COMMENT: ${{ inputs.persistent-comment }}
         COMMENT_MODE: ${{ inputs.comment-mode }}
@@ -241,7 +244,7 @@ runs:
         script: |
           const rawCommand = process.env.RESOLVED_COMMAND || 'review';
           const command = rawCommand.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'review';
-          const marker = `<!-- cursor-review-action:${command} -->`;
+          const marker = process.env.COMMENT_MARKER || `<!-- cursor-review-action:${command} -->`;
           const titles = {
             review: 'Cursor Review',
             ask: 'Cursor Ask',
@@ -250,7 +253,10 @@ runs:
           };
           const prNumber = Number(process.env.PR_NUMBER);
           const reviewBody = process.env.REVIEW_BODY || 'Cursor review produced no output.';
-          const body = `${marker}\n## ${titles[command] || `Cursor ${command}`}\n\n${reviewBody}`;
+          const title = process.env.COMMENT_TITLE || titles[command] || `Cursor ${command}`;
+          const metadataComment = process.env.RUN_METADATA_COMMENT || '';
+          const metadataBlock = metadataComment ? `${metadataComment}\n` : '';
+          const body = `${marker}\n${metadataBlock}## ${title}\n\n${reviewBody}`;
           const persistent = process.env.PERSISTENT_COMMENT === 'true' || process.env.COMMENT_MODE === 'update';
 
           let comment = null;

@@ -11,6 +11,7 @@ from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
+from engine.run_state import build_run_state
 from engine.trust_policy import evaluate_trigger_trust
 
 
@@ -19,7 +20,13 @@ def main() -> int:
     command, user_prompt = derive_command_and_prompt(settings)
     settings["resolved_command"] = command
     settings["resolved_user_prompt"] = user_prompt
+    run_state = build_run_state(settings)
+    settings["run_state"] = run_state["metadata"]
     set_output("resolved_command", command)
+    set_output("comment_marker", run_state["comment_marker"])
+    set_output("comment_title", run_state["comment_title"])
+    set_output("run_metadata_json", run_state["metadata_json"])
+    set_output("run_metadata_comment", run_state["metadata_comment"])
 
     if settings.get("command_prompt_source") in {"slash_command", "trigger_phrase"}:
         command_args = parse_command_args(command, user_prompt)

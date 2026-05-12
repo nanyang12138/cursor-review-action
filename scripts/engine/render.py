@@ -1,5 +1,24 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+
+def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
+    run_state = settings.get("run_state") or {}
+    if not run_state:
+        return []
+    diagnostics = [
+        f"- Run state schema: `{run_state.get('schema_version', 'unknown')}`",
+        f"- Run generated at: `{run_state.get('generated_at', 'unknown')}`",
+        f"- Run event name: `{run_state.get('event_name', 'unknown')}`",
+        f"- Run command source: `{run_state.get('command_source', 'unknown')}`",
+        f"- Run id: `{run_state.get('run_id', '') or 'unknown'}`",
+        f"- Run attempt: `{run_state.get('run_attempt', '') or 'unknown'}`",
+        f"- Base SHA: `{run_state.get('base_sha', '') or 'unknown'}`",
+        f"- Head SHA: `{run_state.get('head_sha', '') or 'unknown'}`",
+        f"- Stale run status: `{run_state.get('stale_status', 'unknown')}`",
+        f"- Idempotency key: `{run_state.get('idempotency_key', 'unknown')}`",
+    ]
+    return diagnostics
 
 
 def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str, Any]) -> str:
@@ -14,6 +33,7 @@ def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str,
         f"- PR is fork: `{str(trigger_diagnostics.get('pr_is_fork', False)).lower()}`",
         f"- Cursor API key present: `{str(trigger_diagnostics.get('cursor_api_key_present', False)).lower()}`",
     ]
+    diagnostics.extend(_run_state_diagnostics(settings))
     return f"""Cursor review skipped before contacting Cursor.
 
 Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
@@ -47,6 +67,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Findings JSON parsed: `{str(parsed_ok).lower()}`",
         f"- Cursor exit code: `{exit_code}`",
     ]
+    diagnostics.extend(_run_state_diagnostics(settings))
     parser_diagnostics = runner_diagnostics.get("parser") or {}
     if parser_diagnostics:
         diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")
