@@ -473,6 +473,11 @@ flowchart TD
   配置键、预算字段、枚举值和 guidance/metadata-cache 边界；workflow-only
   PR metadata 仍保留在 action inputs 中，运行时继续通过 `config/v1`
   diagnostics 处理 unknown keys 与 safe fallbacks。
+- `COMPARISON-PROTOCOL-P1` 的初始 gap log 已按当前实现证据刷新到 12 个
+  repository-owned clean-room 样本，覆盖 review/ask/improve/describe、
+  parser fallback、empty output、generated/lockfile、invalid anchor、dedup、
+  config-only 与 trigger trust 场景；所有 gap 均分类为 completed backlog、
+  deferred 或 non-goal，并保留人工稳定发布 review gate。
 - `docs/non-goals.md` 已记录 `NON-GOALS-P0` 与 `DEFERRED-FEATURES-P1`，
   明确 GitHub App、多平台、auto-fix、inline comments、labels、ticket
   integration、默认 PR body mutation、multi-call chunking、second critique、

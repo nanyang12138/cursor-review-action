@@ -2097,11 +2097,26 @@ class ComparisonProtocolTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertGreaterEqual(report.count("| sample-"), 5)
+        self.assertGreaterEqual(report.count("| sample-"), 10)
+        self.assertIn("This report now covers 12", report)
+        self.assertIn("Human acceptance rubric summary", report)
+        for field in [
+            "real_issue_found",
+            "false_positive_count",
+            "missed_issue_count",
+            "evidence_quality",
+            "command_intent_respected",
+            "output_conciseness",
+            "diagnostics_usefulness",
+            "skipped_content_transparency",
+            "follow_up_action",
+        ]:
+            self.assertIn(field, report)
         gap_sections = [section for section in report.split("\n### ") if section.startswith("GAP-")]
-        self.assertGreaterEqual(len(gap_sections), 5)
+        self.assertGreaterEqual(len(gap_sections), 10)
         for section in gap_sections:
             with self.subTest(gap=section.splitlines()[0]):
+                self.assertRegex(section, r"Status: (completed|deferred|non-goal documented)")
                 self.assertRegex(section, r"Decision: (backlog|deferred|non-goal)")
                 self.assertIn("Capability/status target:", section)
                 self.assertIn("Release impact:", section)
