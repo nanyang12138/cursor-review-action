@@ -52,6 +52,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
     diagnostics.append(f"- Files reviewed: `{len(meta.get('files', []))}`")
+    diagnostics.append(f"- Files skipped: `{len(meta.get('skipped_files', []))}`")
     pull_request_context = meta.get("pull_request_context") or {}
     if pull_request_context:
         commit_count = len(pull_request_context.get("commit_messages") or [])

@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, parser, prompts, render, runner, schemas, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, parser, prompts, render, runner, schemas, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
