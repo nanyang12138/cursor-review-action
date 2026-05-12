@@ -1287,6 +1287,15 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertFalse(result.parsed_ok)
         self.assertEqual(result.diagnostics["reason"], "missing_findings_json")
 
+    def test_parse_agent_output_reports_empty_cursor_output(self) -> None:
+        result = parser.parse_agent_output_result("   \n")
+
+        self.assertIn("Cursor returned empty output", result.markdown)
+        self.assertEqual(json.loads(result.findings_json), [])
+        self.assertFalse(result.parsed_ok)
+        self.assertEqual(result.diagnostics["reason"], "empty_output")
+        self.assertEqual(result.diagnostics["fallback"], "markdown")
+
     def test_build_repair_prompt_embeds_command_schema(self) -> None:
         prompt = parser.build_repair_prompt("describe", "<review_markdown>Summary</review_markdown>")
 

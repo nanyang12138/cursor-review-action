@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+from .budget import normalized_budget_settings
 from .config import DEFAULTS
 from .diff_index import build_diff_index
 from .findings import postprocess_findings_json
@@ -66,6 +67,15 @@ def run_fixture(fixture: Dict[str, Any]) -> FixtureResult:
     runner_diagnostics = dict(fixture.get("runner_diagnostics") or {})
     if parse_result.diagnostics:
         parser_diagnostics = dict(parse_result.diagnostics)
+        parser_diagnostics.setdefault("repair_retry_count", 0)
+        cursor_calls_attempted = int(runner_diagnostics.get("cursor_calls_attempted", 1) or 1)
+        max_cursor_calls = normalized_budget_settings(settings)["max_cursor_calls"]
+        if (
+            int(fixture.get("exit_code", 0)) == 0
+            and not parse_result.parsed_ok
+            and cursor_calls_attempted >= max_cursor_calls
+        ):
+            parser_diagnostics.setdefault("repair_skipped_reason", "max_cursor_calls_exhausted")
         parser_diagnostics["grounding"] = grounding_result.diagnostics
         parser_diagnostics["findings"] = findings_result.diagnostics
         runner_diagnostics.setdefault("parser", parser_diagnostics)

@@ -1,0 +1,88 @@
+{
+  "name": "empty_cursor_output",
+  "capability_ids": [
+    "PARSER-FALLBACK-P0",
+    "PARSER-RETRY-P1",
+    "OUTPUT-QUALITY-GATE-P0",
+    "FIXTURE-HARNESS-P0",
+    "CURSOR-RUNNER-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "empty output diagnostics",
+    "max_findings": 5,
+    "max_cursor_calls": 1
+  },
+  "context": {
+    "diff_text": "diff --git a/src/empty.py b/src/empty.py\n@@ -1,2 +1,3 @@\n def load():\n+    return None\n",
+    "stat": " src/empty.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/empty.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/empty.py",
+          "bytes": 96,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "112",
+        "title": "Return empty load result",
+        "body": "Adds an explicit empty return path.",
+        "base_ref": "main",
+        "head_ref": "feature/empty-output",
+        "commit_messages": [
+          "Return empty load result"
+        ],
+        "changed_files": [
+          "src/empty.py"
+        ],
+        "diff_stat": "src/empty.py | 1 +"
+      }
+    }
+  },
+  "runner_diagnostics": {
+    "runner": "cursor_cli",
+    "cursor_contacted": true,
+    "failure_kind": "output",
+    "timeout_seconds": 600,
+    "retry_count": 0,
+    "cursor_calls_attempted": 1,
+    "max_cursor_calls": 1
+  },
+  "agent_output": "",
+  "expected": {
+    "parsed_ok": false,
+    "findings_type": "array",
+    "findings_count": 0,
+    "prompt_contains": [
+      "Review focus: empty output diagnostics.",
+      "\"title\": \"Return empty load result\"",
+      "src/empty.py"
+    ],
+    "markdown_contains": [
+      "Cursor returned empty output"
+    ],
+    "rendered_contains": [
+      "Cursor returned empty output. No structured findings were published",
+      "Runner failure kind: `output`",
+      "Findings JSON parsed: `false`",
+      "Parser reason: `empty_output`",
+      "Parser fallback: `markdown`",
+      "Parser repair skipped: `max_cursor_calls_exhausted`",
+      "Quality gate decision: `publish_with_diagnostics`",
+      "Quality gate reason: `parser_or_schema_diagnostics`"
+    ],
+    "findings_json_contains": [
+      "[]"
+    ]
+  }
+}

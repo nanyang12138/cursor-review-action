@@ -34,6 +34,14 @@ def _diagnostics(parsed_ok: bool, reason: str, detail: str = "") -> Dict[str, An
 
 
 def parse_agent_output_result(raw: str, command: str = "review") -> ParseResult:
+    if not raw.strip():
+        return ParseResult(
+            "Cursor returned empty output. No structured findings were published; see diagnostics for the runner output failure path.",
+            "[]",
+            False,
+            _diagnostics(False, "empty_output", "Cursor produced no stdout content."),
+        )
+
     markdown = extract_tag(raw, "review_markdown") or raw.strip()
     findings_raw = extract_tag(raw, "findings_json")
 
