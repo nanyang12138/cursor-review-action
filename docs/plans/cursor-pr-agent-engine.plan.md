@@ -88,7 +88,7 @@ todos:
     status: completed
   - id: repo-guidance
     content: 支持 .cursor-review-instructions.md 和 best_practices.md，并添加大小预算与 diagnostics
-    status: pending
+    status: completed
   - id: incremental-scope
     content: 定义 full PR selected diff 默认模式，并将 command-scoped/incremental review 作为 opt-in 能力
     status: pending

@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, fixtures, parser, prompts, render, runner, run_state, taxonomy, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, parser, prompts, render, runner, run_state, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -137,6 +137,27 @@ exclude_patterns: ["dist/**", "*.lock"]
         self.assertEqual(loaded["enabled_commands"], ["review", "ask"])
         self.assertEqual(loaded["exclude_patterns"], ["dist/**", "*.lock"])
 
+    def test_load_simple_yaml_supports_one_level_maps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / ".cursor-review.yml"
+            config_path.write_text(
+                """
+guidance_files:
+  general: ".cursor-review-instructions.md"
+  improve: "best_practices.md"
+guidance_max_bytes: 1024
+""".strip(),
+                encoding="utf-8",
+            )
+
+            loaded = config.load_simple_yaml(config_path)
+
+        self.assertEqual(
+            loaded["guidance_files"],
+            {"general": ".cursor-review-instructions.md", "improve": "best_practices.md"},
+        )
+        self.assertEqual(loaded["guidance_max_bytes"], 1024)
+
     def test_load_settings_reads_pr_metadata_inputs(self) -> None:
         env = {
             "INPUT_PR_NUMBER": "42",
@@ -211,6 +232,107 @@ class ContextBuilderTests(unittest.TestCase):
         self.assertEqual(pr_context["changed_files"], ["scripts/engine/parser.py", "tests/test_engine.py"])
         self.assertEqual(pr_context["diff_stat"], "parser.py | 2 +")
         self.assertEqual(pr_context["comment_prompt"], "Focus on tests.")
+
+
+class RepoGuidanceTests(unittest.TestCase):
+    def test_load_repo_guidance_applies_command_defaults_and_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".cursor-review-instructions.md").write_text("Prefer typed errors.\n", encoding="utf-8")
+            (root / "best_practices.md").write_text("Use small focused helpers.\n", encoding="utf-8")
+
+            review_guidance = guidance.load_repo_guidance(
+                {
+                    "guidance_enabled": True,
+                    "guidance_files": {
+                        "general": ".cursor-review-instructions.md",
+                        "improve": "best_practices.md",
+                    },
+                    "guidance_max_bytes": 20000,
+                    "guidance_max_lines": 400,
+                },
+                "review",
+                root,
+            )
+            improve_guidance = guidance.load_repo_guidance(
+                {
+                    "guidance_enabled": True,
+                    "guidance_files": {
+                        "general": ".cursor-review-instructions.md",
+                        "improve": "best_practices.md",
+                    },
+                    "guidance_max_bytes": 20000,
+                    "guidance_max_lines": 400,
+                },
+                "improve",
+                root,
+            )
+
+        self.assertEqual([item["path"] for item in review_guidance["diagnostics"]["loaded"]], [".cursor-review-instructions.md"])
+        self.assertEqual(review_guidance["diagnostics"]["skipped"], [{"kind": "improve", "path": "best_practices.md", "reason": "command_not_applicable"}])
+        self.assertEqual(
+            [item["path"] for item in improve_guidance["diagnostics"]["loaded"]],
+            [".cursor-review-instructions.md", "best_practices.md"],
+        )
+
+    def test_load_repo_guidance_rejects_unsafe_paths_and_truncates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "guide.md").write_text("abcdef", encoding="utf-8")
+            repo_guidance = guidance.load_repo_guidance(
+                {
+                    "guidance_enabled": True,
+                    "guidance_files": {
+                        "general": "guide.md",
+                        "improve": "../outside.md",
+                    },
+                    "guidance_max_bytes": 3,
+                    "guidance_max_lines": 400,
+                },
+                "improve",
+                root,
+            )
+
+        self.assertEqual(repo_guidance["sections"][0]["content"], "abc")
+        self.assertTrue(repo_guidance["diagnostics"]["loaded"][0]["truncated"])
+        self.assertEqual(repo_guidance["diagnostics"]["skipped"][0]["reason"], "invalid_path")
+
+    def test_build_prompt_injects_guidance_content_and_diagnostics(self) -> None:
+        meta = {
+            "files": ["a.py"],
+            "repo_guidance": {
+                "sections": [
+                    {
+                        "kind": "general",
+                        "path": ".cursor-review-instructions.md",
+                        "content": "Prefer deterministic parser errors.",
+                        "truncated": False,
+                    }
+                ],
+                "diagnostics": {
+                    "enabled": True,
+                    "max_bytes": 20000,
+                    "max_lines": 400,
+                    "bytes_used": 35,
+                    "loaded": [{"kind": "general", "path": ".cursor-review-instructions.md", "bytes": 35}],
+                    "skipped": [],
+                },
+            },
+        }
+
+        prompt = prompts.build_prompt(
+            "review",
+            "",
+            "diff --git a/a.py b/a.py",
+            " a.py | 1 +",
+            False,
+            meta,
+            {"language": "en", "max_findings": 5, "review_focus": "correctness", "model": "auto"},
+        )
+
+        self.assertIn("Prefer deterministic parser errors.", prompt)
+        self.assertIn('"repo_guidance": {', prompt)
+        self.assertIn('".cursor-review-instructions.md"', prompt)
 
 
 class DiffSelectorTests(unittest.TestCase):
@@ -588,6 +710,34 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("PR body provided: `true`", rendered)
         self.assertIn("Commit messages provided: `1`", rendered)
         self.assertNotIn("Sensitive body", rendered)
+
+    def test_render_comment_reports_guidance_diagnostics_without_content(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {
+                "files": ["a.py"],
+                "repo_guidance": {
+                    "diagnostics": {
+                        "enabled": True,
+                        "bytes_used": 24,
+                        "loaded": [{"path": ".cursor-review-instructions.md"}],
+                        "skipped": [{"path": "best_practices.md", "reason": "command_not_applicable"}],
+                    },
+                    "sections": [{"content": "Do not leak this guidance body."}],
+                },
+            },
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("Repo guidance enabled: `true`", rendered)
+        self.assertIn("Repo guidance loaded files: `.cursor-review-instructions.md`", rendered)
+        self.assertIn("best_practices.md:command_not_applicable", rendered)
+        self.assertNotIn("Do not leak this guidance body.", rendered)
 
     def test_render_comment_includes_run_state_diagnostics(self) -> None:
         rendered = render.render_comment(
