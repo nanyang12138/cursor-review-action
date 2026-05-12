@@ -4,7 +4,7 @@ from string import Template
 from typing import Any, Dict
 
 from .config import split_csv
-from .schemas import schema_contract_for_prompt, schema_for_command
+from .schemas import output_schema_for_command, schema_contract_for_prompt, schema_for_command
 
 
 TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
