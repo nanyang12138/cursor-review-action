@@ -19,6 +19,7 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 | PARSER-FALLBACK-P0 | P0 | Implemented in `scripts/engine/parser.py` | Review fixtures and parser unit tests | Parser diagnostics are attached to rendered comment diagnostics | No | Invalid JSON degrades to markdown while preserving diagnostics. |
 | PARSER-COMMAND-SCHEMA-P1 | P1 | Implemented in `scripts/engine/schemas.py` and `scripts/engine/parser.py` | `tests/fixtures/pr_regression/ask_question`, `tests/fixtures/pr_regression/describe_summary`; parser unit tests | Parsed output records command-specific schema status and fallback diagnostics | No for current fixtures; add improve fixture before v1 | Ask and describe use command-specific structured output contracts. |
 | PARSER-RETRY-P1 | P1 | Implemented in `scripts/engine/parser.py` and orchestrated by `scripts/cursor_review.py` | Parser retry unit tests | Retry count and parser failure kind are available in diagnostics | No for P1; add invalid-output fixture before v1 | One repair prompt is used before markdown fallback. |
+| FINDING-TAXONOMY-P0 | P0 | Implemented in `scripts/engine/taxonomy.py`, `scripts/engine/schemas.py`, and parser normalization | `tests/fixtures/pr_regression/security_finding`, `tests/fixtures/pr_regression/style_noise_suppressed`; taxonomy parser unit tests | Taxonomy schema, normalized count, invalid fields, and noise suppression render in diagnostics | No for taxonomy; grounding and output quality gate remain separate blockers | Stable categories, severity, confidence, schema version, and review noise-control are deterministic. |
 | PUB-PERSISTENT-P0 | P0 | Implemented through command-specific markers in `scripts/engine/run_state.py` and rendering outputs | Review and large-partial fixtures; entrypoint unit tests | Outputs include comment marker and run metadata JSON | No | Summary comment publishing remains the P0 surface; inline comments are deferred. |
 | CURSOR-RUNNER-P0 | P0 | Implemented in `scripts/engine/runner.py` | `tests/test_engine.py::RunnerContractTests` | Failure kind, requested model, timeout, retry count, and cursor-call budget are reported | No | Cursor CLI remains the execution layer. |
 | BUDGET-CONTROLS-P1 | P1 | Implemented in `scripts/engine/budget.py`, `scripts/engine/diff_selector.py`, and `scripts/engine/runner.py` | `tests/fixtures/pr_regression/large_partial_review`; budget and runner unit tests | Budget limits, skipped files, and cursor-call attempts are visible | No | `max_cursor_calls` defaults to one. |
@@ -34,12 +35,11 @@ These blockers are not failures of the scorecard itself; they are remaining fina
 product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
 - `prompt-governance`: prompt change checklist and quality metrics are not documented.
-- `finding-taxonomy`: stable taxonomy and noise-control rules are not implemented.
 - `repo-guidance`: `.cursor-review-instructions.md` / `best_practices.md` injection is not implemented.
 - `local-dry-run`: no dedicated local dry-run command or documentation exists yet.
 - `privacy-logging`: redaction policy and token-like diagnostic safeguards are incomplete.
 - `review-lifecycle`: final lifecycle state diagnostics exist but lifecycle documentation and state model are incomplete.
-- `fixture-inventory`: the current suite has 5 concrete PR fixtures; v0.5 requires 10 and v1 targets 20.
+- `fixture-inventory`: the current suite has 6 concrete PR fixtures; v0.5 requires 10 and v1 targets 20.
 - `finding-grounding`: selected-diff line index and anchor validation are not implemented.
 - `finding-dedup`: same-run finding normalization and deduplication are not implemented.
 - `output-quality-gate`: deterministic publish decision is not implemented.

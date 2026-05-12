@@ -4,9 +4,12 @@ from typing import Any, Dict
 
 
 SCHEMA_VERSION = "cursor-review-action/v1"
+FINDING_SCHEMA_VERSION = "cursor-review-finding/v1"
 
 _REVIEW_FINDING = {
-    "severity": "critical|high|medium|low",
+    "schema_version": FINDING_SCHEMA_VERSION,
+    "category": "bug|security|test_gap|performance|regression_risk|maintainability|docs|question",
+    "severity": "critical|high|medium|low|info",
     "confidence": "high|medium|low",
     "file": "path relative to repository root, or empty string when not file-specific",
     "line": "new-side line number as integer, or null when not line-specific",
@@ -14,6 +17,7 @@ _REVIEW_FINDING = {
     "body": "why this matters and what can go wrong",
     "suggestion": "concrete fix or mitigation",
     "evidence": "brief quote or description from the selected diff/context",
+    "noise_control": "actionable_review",
 }
 
 SCHEMAS: Dict[str, Dict[str, Any]] = {
@@ -44,6 +48,7 @@ SCHEMAS: Dict[str, Dict[str, Any]] = {
         "properties": {
             "suggestions": [
                 {
+                    "schema_version": FINDING_SCHEMA_VERSION,
                     "priority": "high|medium|low",
                     "category": "maintainability|readability|tests|performance|developer-experience",
                     "file": "path relative to repository root, or empty string",

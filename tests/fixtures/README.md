@@ -10,6 +10,9 @@ review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
 - `security_finding`: high-risk review finding with structured JSON.
+- `style_noise_suppressed`: review noise-control fixture that routes style
+  feedback toward `/cursor-improve` instead of treating it as a high-confidence
+  review finding.
 - `large_partial_review`: partial review diagnostics for budget-limited diffs.
 - `ask_question`: command-specific ask schema and answer rendering.
 - `describe_summary`: command-specific describe schema and comment-only summary.

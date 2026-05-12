@@ -50,7 +50,7 @@ def run_fixture(fixture: Dict[str, Any]) -> FixtureResult:
         context.get("meta") or {},
         settings,
     )
-    parse_result = parse_agent_output_result(fixture.get("agent_output", ""))
+    parse_result = parse_agent_output_result(fixture.get("agent_output", ""), command)
     runner_diagnostics = dict(fixture.get("runner_diagnostics") or {})
     if parse_result.diagnostics:
         runner_diagnostics.setdefault("parser", parse_result.diagnostics)
@@ -110,6 +110,7 @@ def validate_fixture(fixture: Dict[str, Any], result: FixtureResult) -> List[str
     errors.extend(_missing_snippets("prompt", result.prompt, expected.get("prompt_contains") or []))
     errors.extend(_missing_snippets("markdown", result.markdown, expected.get("markdown_contains") or []))
     errors.extend(_missing_snippets("rendered", result.rendered, expected.get("rendered_contains") or []))
+    errors.extend(_missing_snippets("findings_json", result.findings_json, expected.get("findings_json_contains") or []))
     for snippet in expected.get("rendered_not_contains") or []:
         if snippet in result.rendered:
             errors.append(f"rendered included forbidden snippet: {snippet}")

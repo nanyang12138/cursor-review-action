@@ -9,6 +9,7 @@ Review focus: {{focus}}.
 Command-specific requirements:
 - Report only issues that are grounded in the selected PR context.
 - Prioritize bugs, security problems, regressions, and missing tests over style preferences.
+- Use the finding taxonomy categories exactly as defined in the JSON schema; style, readability, refactor, formatting, nit, docs-only, and question feedback belongs in /cursor-improve or /cursor-ask, not /cursor-review.
 - If there are no actionable findings, say so clearly and return an empty JSON array.
 
 Response contract:

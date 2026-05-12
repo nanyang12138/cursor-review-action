@@ -41,8 +41,10 @@ behavior is described only as a product-behavior class.
 - Gap: Security findings are parsed and rendered, but stable taxonomy,
   severity/confidence normalization, and noise-control rules are not enforced
   before `max_findings`.
-- Evidence: `finding-taxonomy` remains pending in the plan and
-  `docs/finding-taxonomy.md` does not exist yet.
+- Evidence: implemented in `scripts/engine/taxonomy.py` and
+  `docs/finding-taxonomy.md`; fixtures cover security taxonomy and review
+  noise-control downgrade. Grounding, dedup, and output quality gate remain
+  separate backlog gaps.
 - Decision: backlog
 - Capability/status target: `finding-taxonomy`, `FINDING-TAXONOMY-P0`
 - Follow-up document or issue: `scripts/engine/taxonomy.py` and

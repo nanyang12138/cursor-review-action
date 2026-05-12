@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, fixtures, parser, prompts, render, runner, run_state, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, parser, prompts, render, runner, run_state, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -310,7 +310,8 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Additional user instructions from PR comment", prompt)
         self.assertIn("<review_markdown>", prompt)
         self.assertIn('"command": "review"', prompt)
-        self.assertIn('"severity": "critical|high|medium|low"', prompt)
+        self.assertIn('"category": "bug|security|test_gap|performance|regression_risk|maintainability|docs|question"', prompt)
+        self.assertIn('"severity": "critical|high|medium|low|info"', prompt)
         self.assertIn('"diff_truncated": false', prompt)
 
     def test_build_prompt_uses_command_specific_template_and_schema(self) -> None:
@@ -407,7 +408,46 @@ class PromptParserRenderTests(unittest.TestCase):
 
         self.assertEqual(markdown, "No issues.")
         self.assertTrue(parsed_ok)
-        self.assertEqual(json.loads(findings_json), [{"severity": "low", "file": "a.py"}])
+        parsed = json.loads(findings_json)
+        self.assertEqual(parsed[0]["severity"], "low")
+        self.assertEqual(parsed[0]["file"], "a.py")
+        self.assertEqual(parsed[0]["schema_version"], taxonomy.FINDING_SCHEMA_VERSION)
+        self.assertEqual(parsed[0]["category"], "bug")
+        self.assertEqual(parsed[0]["confidence"], "medium")
+
+    def test_parse_agent_output_applies_finding_taxonomy_diagnostics(self) -> None:
+        raw = """
+<review_markdown>Potential auth bypass.</review_markdown>
+<findings_json>[{"category":"security","severity":"HIGH","confidence":"HIGH","file":"auth.py","line":4,"title":"Auth bypass","body":"A token can be reused.","evidence":"token"}]</findings_json>
+"""
+
+        result = parser.parse_agent_output_result(raw, "review")
+        parsed = json.loads(result.findings_json)
+
+        self.assertTrue(result.parsed_ok)
+        self.assertEqual(parsed[0]["schema_version"], taxonomy.FINDING_SCHEMA_VERSION)
+        self.assertEqual(parsed[0]["category"], "security")
+        self.assertEqual(parsed[0]["severity"], "high")
+        self.assertEqual(parsed[0]["confidence"], "high")
+        self.assertEqual(result.diagnostics["taxonomy"]["normalized_count"], 1)
+        self.assertEqual(result.diagnostics["taxonomy"]["noise_suppressed_count"], 0)
+
+    def test_parse_agent_output_marks_review_noise_for_improve_route(self) -> None:
+        raw = """
+<review_markdown>Prefer renaming this helper.</review_markdown>
+<findings_json>[{"category":"style","severity":"high","confidence":"high","file":"a.py","line":2,"title":"Rename helper","body":"This is a readability preference.","evidence":"def x()"}]</findings_json>
+"""
+
+        result = parser.parse_agent_output_result(raw, "review")
+        parsed = json.loads(result.findings_json)
+
+        self.assertEqual(parsed[0]["category"], "style")
+        self.assertEqual(parsed[0]["severity"], "low")
+        self.assertEqual(parsed[0]["confidence"], "low")
+        self.assertTrue(parsed[0]["suppressed"])
+        self.assertEqual(parsed[0]["suppression_reason"], "review_noise_control")
+        self.assertEqual(parsed[0]["noise_control"], "route_to_cursor_improve")
+        self.assertEqual(result.diagnostics["taxonomy"]["noise_suppressed_count"], 1)
 
     def test_parse_agent_output_accepts_command_json_object(self) -> None:
         raw = """

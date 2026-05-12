@@ -1,6 +1,8 @@
 import os
 from typing import Any, Dict, List, Optional
 
+from .taxonomy import taxonomy_summary
+
 
 def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
     run_state = settings.get("run_state") or {}
@@ -73,6 +75,8 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")
         diagnostics.append(f"- Parser fallback: `{parser_diagnostics.get('fallback', 'unknown')}`")
         diagnostics.append(f"- Parser repair retry count: `{parser_diagnostics.get('repair_retry_count', 0)}`")
+        for label, value in taxonomy_summary(parser_diagnostics.get("taxonomy") or {}):
+            diagnostics.append(f"- {label}: `{str(value).lower() if isinstance(value, bool) else value}`")
         if parser_diagnostics.get("repair_skipped_reason"):
             diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
         if "repair_succeeded" in parser_diagnostics:

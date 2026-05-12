@@ -1012,6 +1012,17 @@ Validation checklist:
 - `max_findings` is applied after severity/confidence sorting.
 - Empty findings produce a clear "no actionable findings" result.
 
+Implementation evidence:
+
+- `scripts/engine/taxonomy.py` normalizes review finding `schema_version`,
+  category, severity, confidence, and review noise-control fields.
+- `tests/fixtures/pr_regression/security_finding` covers explicit security
+  typing; `tests/fixtures/pr_regression/style_noise_suppressed` covers
+  style/readability feedback downgrade.
+- `max_findings` ordering remains tied to the later finding deduplication and
+  output quality gate work; taxonomy diagnostics now expose the required fields
+  for that gate.
+
 ### Finding Deduplication and Suppression
 
 PR-Agent behavior to learn from:

@@ -85,7 +85,7 @@ todos:
     status: pending
   - id: finding-taxonomy
     content: 建立 finding taxonomy、severity/confidence/noise-control 规则和 schema_version
-    status: pending
+    status: completed
   - id: repo-guidance
     content: 支持 .cursor-review-instructions.md 和 best_practices.md，并添加大小预算与 diagnostics
     status: pending

@@ -83,7 +83,7 @@ def main() -> int:
     stderr = runner_result.stderr
     raw_output = stdout + ("\n\nSTDERR:\n" + stderr if stderr else "")
 
-    parse_result = parse_agent_output_result(stdout)
+    parse_result = parse_agent_output_result(stdout, command)
     markdown = parse_result.markdown
     findings_json = parse_result.findings_json
     parsed_ok = parse_result.parsed_ok
@@ -97,7 +97,7 @@ def main() -> int:
         if cursor_calls_attempted < max_cursor_calls:
             repair_prompt = build_repair_prompt(command, stdout)
             repair_result = run_cursor_result(repair_prompt, settings)
-            repair_parse_result = parse_agent_output_result(repair_result.raw_text)
+            repair_parse_result = parse_agent_output_result(repair_result.raw_text, command)
             cursor_calls_attempted += 1
             raw_output = (
                 f"{raw_output}\n\nPARSER_REPAIR_STDOUT:\n{repair_result.raw_text}"

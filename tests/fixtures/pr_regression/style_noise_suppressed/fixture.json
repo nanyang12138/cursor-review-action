@@ -1,0 +1,74 @@
+{
+  "name": "style_noise_suppressed",
+  "capability_ids": [
+    "FINDING-TAXONOMY-P0",
+    "PROMPT-REVIEW-P0",
+    "PARSER-FALLBACK-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "correctness,security,tests",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/src/helpers.py b/src/helpers.py\n@@ -1,3 +1,4 @@\n+def x(value):\n+    return value\n",
+    "stat": " src/helpers.py | 2 ++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/helpers.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/helpers.py",
+          "bytes": 97,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "106",
+        "title": "Add small helper",
+        "body": "Adds a helper used by a later PR.",
+        "base_ref": "main",
+        "head_ref": "feature/helper",
+        "commit_messages": [
+          "Add helper"
+        ],
+        "changed_files": [
+          "src/helpers.py"
+        ],
+        "diff_stat": "src/helpers.py | 2 ++"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Consider a more descriptive helper name.</review_markdown>\n<findings_json>[{\"category\":\"style\",\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"src/helpers.py\",\"line\":1,\"title\":\"Use a clearer helper name\",\"body\":\"The short name is harder to read.\",\"suggestion\":\"Rename x to describe its purpose.\",\"evidence\":\"def x(value):\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "style, readability, refactor, formatting, nit, docs-only, and question feedback belongs in /cursor-improve or /cursor-ask",
+      "\"category\": \"bug|security|test_gap|performance|regression_risk|maintainability|docs|question\""
+    ],
+    "markdown_contains": [
+      "Consider a more descriptive helper name."
+    ],
+    "rendered_contains": [
+      "Taxonomy noise suppressed: `1`",
+      "Taxonomy normalized findings: `1`"
+    ],
+    "findings_json_contains": [
+      "\"category\": \"style\"",
+      "\"severity\": \"low\"",
+      "\"confidence\": \"low\"",
+      "\"suppressed\": true",
+      "\"suppression_reason\": \"review_noise_control\"",
+      "\"noise_control\": \"route_to_cursor_improve\""
+    ]
+  }
+}
