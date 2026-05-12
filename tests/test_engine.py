@@ -827,6 +827,23 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Files reviewed: `2`", rendered)
         self.assertIn("Files skipped: `0`", rendered)
 
+    def test_render_comment_declares_human_advisory_policy(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("advisory and non-blocking", rendered)
+        self.assertIn("does not approve, merge, or block PRs by default", rendered)
+        self.assertIn("Review policy: `advisory_non_blocking`", rendered)
+        self.assertIn("Human decision required: `true`", rendered)
+
     def test_render_comment_reports_schema_compatibility_diagnostics(self) -> None:
         rendered = render.render_comment(
             "No issues.",
