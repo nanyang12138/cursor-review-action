@@ -1,0 +1,80 @@
+{
+  "name": "renamed_file_anchor",
+  "capability_ids": [
+    "DIFF-INDEX-P0",
+    "FINDING-GROUNDING-P0",
+    "PROMPT-REVIEW-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "security",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/src/legacy_client.py b/src/api_client.py\nsimilarity index 82%\nrename from src/legacy_client.py\nrename to src/api_client.py\n--- a/src/legacy_client.py\n+++ b/src/api_client.py\n@@ -18,7 +18,8 @@ def fetch_user(user_id, token):\n     headers = {\"Authorization\": f\"Bearer {token}\"}\n-    response = http.get(f\"/users/{user_id}\", headers=headers)\n+    response = http.get(f\"/users/{user_id}\", headers=headers, timeout=None)\n+    audit.log(\"fetch_user\", token)\n     return response.json()\n",
+    "stat": " src/{legacy_client.py => api_client.py} | 3 ++-",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/api_client.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/api_client.py",
+          "old_path": "src/legacy_client.py",
+          "bytes": 393,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "116",
+        "title": "Rename API client and add audit logging",
+        "body": "Renames the client module while adding audit logging around user fetches.",
+        "base_ref": "main",
+        "head_ref": "feature/rename-api-client",
+        "commit_messages": [
+          "Rename API client and add audit logging"
+        ],
+        "changed_files": [
+          "src/legacy_client.py",
+          "src/api_client.py"
+        ],
+        "diff_stat": "src/{legacy_client.py => api_client.py} | 3 ++-"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Found a security issue in the renamed API client.</review_markdown>\n<findings_json>[{\"schema_version\":\"cursor-review-finding/v1\",\"category\":\"security\",\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"src/legacy_client.py\",\"line\":20,\"title\":\"Avoid writing access tokens to audit logs\",\"body\":\"The renamed API client now logs the bearer token value, which can expose credentials through audit log storage.\",\"suggestion\":\"Log a request identifier or redacted token hash instead of the raw token.\",\"evidence\":\"audit.log(\\\"fetch_user\\\", token)\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "\"old_path\": \"src/legacy_client.py\"",
+      "\"new_path\": \"src/api_client.py\"",
+      "rename from src/legacy_client.py",
+      "Rename API client and add audit logging"
+    ],
+    "markdown_contains": [
+      "renamed API client"
+    ],
+    "rendered_contains": [
+      "Found a security issue in the renamed API client.",
+      "Files reviewed: `1`",
+      "Grounding anchored findings: `1`",
+      "Quality gate decision: `publish`",
+      "Quality gate publishable findings: `1`"
+    ],
+    "findings_json_contains": [
+      "\"file\": \"src/legacy_client.py\"",
+      "\"grounding_status\": \"anchored\"",
+      "\"grounding_reason\": \"new_changed_line\"",
+      "\"file\": \"src/api_client.py\""
+    ]
+  }
+}

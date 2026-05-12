@@ -1668,8 +1668,8 @@ Current action:
 
 - Defines the minimum fixture inventory and tracks concrete no-Cursor fixtures
   in `tests/fixtures/README.md` and `docs/parity-scorecard.md`.
-- As of the config-only review fixture, the suite has 16 concrete no-Cursor
-  fixtures: 14 PR regression fixtures, 1 output quality gate fixture, and 1
+- As of the renamed-file anchor fixture, the suite has 17 concrete no-Cursor
+  fixtures: 15 PR regression fixtures, 1 output quality gate fixture, and 1
   config-invalid fixture.
 
 Cursor-native implementation:
@@ -1739,7 +1739,10 @@ Implementation evidence:
 - `tests/fixtures/pr_regression/config_only_review` covers a configuration-only
   PR and verifies effective config diagnostics, prompt context, and rendered
   output without exposing the PR body.
-- `tests/fixtures/README.md` records the 16 concrete no-Cursor fixtures and the
+- `tests/fixtures/pr_regression/renamed_file_anchor` covers a renamed-file PR and
+  verifies old/new path aliases in the selected-diff index can anchor a new-side
+  finding without requiring inline comments.
+- `tests/fixtures/README.md` records the 17 concrete no-Cursor fixtures and the
   remaining `v1` target of 20 fixtures.
 - `docs/parity-scorecard.md` tracks `FIXTURE-HARNESS-P0` evidence and keeps the
   remaining final-product fixture blockers visible.

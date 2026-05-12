@@ -456,12 +456,12 @@ flowchart TD
 - Redaction failure 会阻止 raw comment publishing。
 - 当前未决问题全部已有默认决策，且记录在 `PR_AGENT_ENGINE_MAPPING.md` 的 `Resolved Open Questions` 与 Round K。
 - `v0.5` fixture gate 明确为 10 个 concrete fixtures，`v1` 目标为 20 个。
-- `v0.5` fixture volume gate 已由 16 个 no-Cursor concrete fixtures 覆盖，其中
+- `v0.5` fixture volume gate 已由 17 个 no-Cursor concrete fixtures 覆盖，其中
   invalid config 与 empty Cursor output 负向夹具已验证 safe fallback diagnostics，
   improve/repo-guidance 夹具已验证 `/cursor-improve` schema 与 guidance diagnostics，
   deleted-only、generated/lockfile 与 config-only 夹具已验证 anchor/skipped-file/config
-  diagnostics；
-  `v1` 仍需继续扩展到 20 个，优先补齐 renamed/many-small-file
+  diagnostics，renamed-file 夹具已验证 old/new path alias grounding；
+  `v1` 仍需继续扩展到 20 个，优先补齐 many-small-file
   与 dogfooding-derived final-product 案例。
 - `file_only`、deleted-only、partial review、untrusted command、quality gate output 都有默认渲染/诊断策略。
 - Release checklist 通过后才能打稳定 tag。
