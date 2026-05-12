@@ -55,7 +55,7 @@ todos:
     status: completed
   - id: command-templates
     content: 为 review/ask/improve/describe 建立独立 prompt template 和 output schema
-    status: pending
+    status: completed
   - id: context-builder
     content: 加入 PR title/body、commit messages、changed files、diff stat、comment prompt 等上下文
     status: completed
