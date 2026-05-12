@@ -1340,7 +1340,9 @@ PR-Agent behavior to learn from:
 
 Current action:
 
-- Has `fail-on-error` and `fail-on-findings`, but no policy guidance.
+- Has `fail-on-error` and `fail-on-findings`.
+- Implements deterministic `ci-policy-json` diagnostics.
+- Documents the default non-blocking policy in `docs/ci-policy.md`.
 
 Cursor-native implementation:
 
@@ -1352,6 +1354,8 @@ Cursor-native implementation:
 Implementation target:
 
 - `docs/ci-policy.md`
+- `scripts/engine/ci_policy.py`
+- `ci-policy-json` action output
 
 Parity level:
 

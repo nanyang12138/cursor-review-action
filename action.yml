@@ -170,6 +170,9 @@ outputs:
   findings-json:
     description: "Structured findings JSON when available."
     value: ${{ steps.review.outputs.findings_json }}
+  ci-policy-json:
+    description: "Machine-readable CI status policy decision for this run."
+    value: ${{ steps.review.outputs.ci_policy_json }}
   exit-code:
     description: "Cursor agent exit code."
     value: ${{ steps.review.outputs.exit_code }}

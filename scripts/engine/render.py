@@ -126,6 +126,16 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
     if trigger_trust:
         diagnostics.append(f"- Trigger trust level: `{trigger_trust.get('trust_level', 'unknown')}`")
         diagnostics.append(f"- Trigger reason: `{trigger_trust.get('reason', 'unknown')}`")
+    ci_policy = runner_diagnostics.get("ci_policy") or {}
+    if ci_policy:
+        diagnostics.append(f"- CI policy schema: `{ci_policy.get('schema_version', 'unknown')}`")
+        diagnostics.append(f"- CI default: `{ci_policy.get('default', 'unknown')}`")
+        diagnostics.append(f"- CI fail on error: `{str(ci_policy.get('fail_on_error', False)).lower()}`")
+        diagnostics.append(f"- CI fail on findings: `{str(ci_policy.get('fail_on_findings', False)).lower()}`")
+        diagnostics.append(f"- CI findings gate status: `{ci_policy.get('findings_gate_status', 'unknown')}`")
+        diagnostics.append(f"- CI workflow exit code: `{ci_policy.get('workflow_exit_code', 0)}`")
+        diagnostics.append(f"- CI policy reason: `{ci_policy.get('reason', 'unknown')}`")
+        diagnostics.append(f"- CI high severity findings: `{ci_policy.get('high_severity_finding_count', 0)}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
     repo_guidance = meta.get("repo_guidance") or {}

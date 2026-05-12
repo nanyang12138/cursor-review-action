@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from engine.budget import normalized_budget_settings
+from engine.ci_policy import ci_policy_json, evaluate_ci_policy
 from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
@@ -31,10 +32,12 @@ def main() -> int:
 
     if command == "help":
         rendered = render_help(settings)
+        ci_policy = evaluate_ci_policy(0, "[]", settings)
         Path("cursor_review.md").write_text(rendered, encoding="utf-8")
         Path("findings.json").write_text("[]", encoding="utf-8")
         set_output("summary", rendered)
         set_output("findings_json", "[]")
+        set_output("ci_policy_json", ci_policy_json(ci_policy))
         set_output("exit_code", "0")
         set_output("diff_truncated", "false")
         set_output("should_comment", "true")
@@ -56,27 +59,31 @@ def main() -> int:
     enabled, message = ensure_command_enabled(command, settings)
     if not enabled:
         rendered = f"{message}\n"
+        ci_policy = evaluate_ci_policy(78, "[]", settings)
         set_output("summary", rendered)
         set_output("findings_json", "[]")
+        set_output("ci_policy_json", ci_policy_json(ci_policy))
         set_output("exit_code", "78")
         set_output("diff_truncated", "false")
         set_output("should_comment", "true")
         write_step_summary(rendered)
-        return 78 if settings.get("fail_on_error") else 0
+        return int(ci_policy["workflow_exit_code"])
 
     trigger_decision = evaluate_trigger_trust(settings)
     settings["trigger_trust"] = trigger_decision.diagnostics
     if not trigger_decision.allowed:
         rendered = render_trigger_skip(trigger_decision.diagnostics, settings)
+        ci_policy = evaluate_ci_policy(78, "[]", settings)
         Path("cursor_review.md").write_text(rendered, encoding="utf-8")
         Path("findings.json").write_text("[]", encoding="utf-8")
         set_output("summary", rendered)
         set_output("findings_json", "[]")
+        set_output("ci_policy_json", ci_policy_json(ci_policy))
         set_output("exit_code", "78")
         set_output("diff_truncated", "false")
         set_output("should_comment", str(trigger_decision.should_comment).lower())
         write_step_summary(rendered)
-        return 78 if settings.get("fail_on_error") else 0
+        return int(ci_policy["workflow_exit_code"])
 
     context = build_review_context(settings)
     settings["prompt_template_version"] = prompt_template_version()
@@ -136,6 +143,8 @@ def main() -> int:
     runner_diagnostics["cursor_calls_attempted"] = cursor_calls_attempted
     runner_diagnostics["retry_count"] = parser_diagnostics.get("repair_retry_count", 0)
     runner_diagnostics["parser"] = parser_diagnostics
+    ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
+    runner_diagnostics["ci_policy"] = ci_policy
     Path("cursor_review_raw.txt").write_text(raw_output, encoding="utf-8")
     rendered = render_comment(
         markdown,
@@ -153,15 +162,13 @@ def main() -> int:
 
     set_output("summary", rendered)
     set_output("findings_json", findings_json)
+    set_output("ci_policy_json", ci_policy_json(ci_policy))
     set_output("exit_code", str(exit_code))
     set_output("diff_truncated", str(context.truncated).lower())
     set_output("should_comment", "true")
     write_step_summary(rendered)
 
-    if exit_code != 0 and settings.get("fail_on_error"):
-        return exit_code
-
-    return 0
+    return int(ci_policy["workflow_exit_code"])
 
 
 if __name__ == "__main__":
