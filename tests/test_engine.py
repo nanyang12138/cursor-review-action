@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, localization, parser, prompts, quality_gate, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -779,6 +779,79 @@ class FindingDedupTests(unittest.TestCase):
         self.assertEqual([item["title"] for item in processed], ["Grounded bug", "Grounded test gap"])
 
 
+class OutputQualityGateTests(unittest.TestCase):
+    def test_quality_gate_downgrades_unsupported_external_claims(self) -> None:
+        payload = [
+            {
+                "schema_version": schemas.FINDING_SCHEMA_VERSION,
+                "category": "test_gap",
+                "severity": "high",
+                "confidence": "high",
+                "file": "tests/test_app.py",
+                "line": 12,
+                "title": "Tests passed but assertion is missing",
+                "body": "All tests passed, but this new branch lacks an assertion.",
+                "suggestion": "Add an assertion that covers the new branch.",
+                "evidence": "+    if value: return True",
+                "grounding_status": "anchored",
+            }
+        ]
+
+        result = quality_gate.evaluate_output_quality(
+            "One finding.",
+            json.dumps(payload),
+            0,
+            True,
+            False,
+            {"files": ["tests/test_app.py"], "skipped_files": []},
+            {"resolved_command": "review"},
+            {"parser": {"schema": {"compatible": True}}},
+            redaction.redact_text(""),
+        )
+        gated = json.loads(result.findings_json)
+
+        self.assertEqual(result.diagnostics["schema_version"], quality_gate.QUALITY_GATE_SCHEMA_VERSION)
+        self.assertEqual(result.diagnostics["publish_decision"], quality_gate.SUPPRESS_FINDINGS)
+        self.assertEqual(result.diagnostics["unsupported_claim_count"], 1)
+        self.assertTrue(gated[0]["unsupported_claim"])
+        self.assertEqual(gated[0]["confidence"], "low")
+        self.assertTrue(gated[0]["suppressed"])
+        self.assertEqual(gated[0]["quality_gate_status"], "suppressed")
+
+    def test_quality_gate_marks_truncated_reviews_partial(self) -> None:
+        result = quality_gate.evaluate_output_quality(
+            "No findings.",
+            "[]",
+            0,
+            True,
+            True,
+            {"files": ["src/app.py"], "skipped_files": [{"path": "src/large.py", "reason": "max_files"}]},
+            {"resolved_command": "review"},
+            {"parser": {"schema": {"compatible": True}}},
+            redaction.redact_text(""),
+        )
+
+        self.assertEqual(result.diagnostics["publish_decision"], quality_gate.PUBLISH_PARTIAL)
+        self.assertEqual(result.diagnostics["coverage_status"], "partial")
+        self.assertEqual(result.diagnostics["skipped_file_count"], 1)
+
+    def test_quality_gate_blocks_redaction_failure(self) -> None:
+        result = quality_gate.evaluate_output_quality(
+            "Sensitive output.",
+            "[]",
+            0,
+            True,
+            False,
+            {"files": []},
+            {"resolved_command": "review"},
+            {"parser": {"schema": {"compatible": True}}, "redaction_failure": True},
+            redaction.redact_text(""),
+        )
+
+        self.assertEqual(result.diagnostics["publish_decision"], quality_gate.FAIL_BEFORE_PUBLISH)
+        self.assertEqual(result.diagnostics["reason"], "redaction_failed")
+
+
 class PromptParserRenderTests(unittest.TestCase):
     def test_build_prompt_preserves_response_contract_and_diagnostics(self) -> None:
         settings = {
@@ -1528,8 +1601,34 @@ class FixtureRegressionTests(unittest.TestCase):
 
                 self.assertEqual(fixtures.validate_fixture(fixture, result), [])
 
+    def test_quality_gate_fixtures_match_prompt_parser_render_contract(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "quality_gate"
+        fixture_paths = fixtures.discover_fixture_paths(fixture_root)
+
+        self.assertGreaterEqual(len(fixture_paths), 1)
+        for fixture_path in fixture_paths:
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                result = fixtures.run_fixture(fixture)
+
+                self.assertEqual(fixtures.validate_fixture(fixture, result), [])
+
     def test_pr_regression_fixtures_have_capability_trace_files(self) -> None:
         fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                capabilities_path = fixture_path.parent / "capabilities.txt"
+                self.assertTrue(capabilities_path.exists())
+                capabilities = [
+                    line.strip()
+                    for line in capabilities_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                self.assertEqual(capabilities, fixture["capability_ids"])
+
+    def test_quality_gate_fixtures_have_capability_trace_files(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "quality_gate"
         for fixture_path in fixtures.discover_fixture_paths(fixture_root):
             with self.subTest(fixture=fixture_path.parent.name):
                 fixture = fixtures.load_fixture(fixture_path)

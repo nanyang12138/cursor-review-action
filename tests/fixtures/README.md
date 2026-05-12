@@ -21,6 +21,12 @@ review harness covers:
 - `duplicate_findings`: same-run deduplication fixture that collapses duplicate
   same-line findings before applying `max_findings`.
 
+Output quality gate fixtures live under `tests/fixtures/quality_gate/*` and cover
+deterministic publish-decision behavior. The initial quality gate fixture is:
+
+- `unsupported_claim`: downgrades an unsupported external "tests passed" claim
+  before it can be treated as a high-confidence review finding.
+
 The comparison protocol lives in `docs/parity-reports/` and uses these
 repository-owned fixtures as initial samples. The fixtures intentionally do not
 copy PR-Agent prompts, schemas, output, or golden text.

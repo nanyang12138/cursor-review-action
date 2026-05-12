@@ -15,6 +15,7 @@ from engine.help import render_help
 from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
 from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt, prompt_template_version
+from engine.quality_gate import evaluate_output_quality
 from engine.redaction import combine_results, redact_text
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
@@ -184,8 +185,6 @@ def main(argv: list[str] | None = None) -> int:
     findings_json = findings_result.findings_json
     parser_diagnostics["findings"] = findings_result.diagnostics
     runner_diagnostics["parser"] = parser_diagnostics
-    ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
-    runner_diagnostics["ci_policy"] = ci_policy
     markdown_redaction = redact_text(markdown)
     findings_redaction = redact_text(findings_json)
     stderr_redaction = redact_text(stderr)
@@ -201,6 +200,22 @@ def main(argv: list[str] | None = None) -> int:
     markdown = markdown_redaction.text
     findings_json = findings_redaction.text
     stderr = stderr_redaction.text
+    quality_result = evaluate_output_quality(
+        markdown,
+        findings_json,
+        exit_code,
+        parsed_ok,
+        context.truncated,
+        context.meta,
+        settings,
+        runner_diagnostics,
+        runner_diagnostics["redaction"],
+    )
+    findings_json = quality_result.findings_json
+    parser_diagnostics["quality_gate"] = quality_result.diagnostics
+    runner_diagnostics["quality_gate"] = quality_result.diagnostics
+    ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
+    runner_diagnostics["ci_policy"] = ci_policy
     if settings.get("debug_artifacts"):
         Path("cursor_review_raw.txt").write_text(raw_output_redaction.text, encoding="utf-8")
     rendered = render_comment(

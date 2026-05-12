@@ -1161,6 +1161,23 @@ Validation checklist:
 - Quality gate output is included in no-Cursor fixtures.
 - Quality gate does not claim to prove findings are correct, only that they meet publication rules.
 
+Implementation evidence:
+
+- `scripts/engine/quality_gate.py` implements deterministic `output-quality-gate/v1`
+  diagnostics and publish decisions: `publish`, `publish_partial`,
+  `publish_with_diagnostics`, `suppress_findings`, and `fail_before_publish`.
+- Live, local dry-run, and fixture paths call the quality gate after parser,
+  grounding, deduplication, and redaction diagnostics, and before CI policy
+  evaluation or final rendering.
+- `tests/test_engine.py::OutputQualityGateTests` covers unsupported-claim
+  downgrade, partial-review decisions, and redaction-failure blocking.
+- `tests/fixtures/quality_gate/unsupported_claim` adds no-Cursor fixture coverage
+  proving unsupported external "tests passed" claims are downgraded and surfaced
+  in rendered diagnostics.
+- `docs/output-quality-gate.md` documents the deterministic decision model,
+  unsupported-claim boundary, diagnostics surfaces, and advisory/non-blocking
+  behavior.
+
 ### Repository Guidance and Best Practices Injection
 
 PR-Agent behavior to learn from:

@@ -144,6 +144,17 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
             diagnostics.append(f"- Finding duplicate count: `{findings.get('duplicate_count', 0)}`")
             diagnostics.append(f"- Finding capped count: `{findings.get('capped_count', 0)}`")
             diagnostics.append(f"- Finding output count: `{findings.get('output_count', 0)}`")
+        quality_gate = parser_diagnostics.get("quality_gate") or runner_diagnostics.get("quality_gate") or {}
+        if quality_gate:
+            diagnostics.append(f"- Quality gate schema: `{quality_gate.get('schema_version', 'unknown')}`")
+            diagnostics.append(f"- Quality gate decision: `{quality_gate.get('publish_decision', 'unknown')}`")
+            diagnostics.append(f"- Quality gate reason: `{quality_gate.get('reason', 'unknown')}`")
+            diagnostics.append(f"- Quality gate coverage: `{quality_gate.get('coverage_status', 'unknown')}`")
+            diagnostics.append(f"- Quality gate publishable findings: `{quality_gate.get('publishable_finding_count', 0)}`")
+            diagnostics.append(f"- Quality gate human-verification findings: `{quality_gate.get('human_verification_finding_count', 0)}`")
+            diagnostics.append(f"- Quality gate suppressed findings: `{quality_gate.get('suppressed_finding_count', 0)}`")
+            diagnostics.append(f"- Quality gate unsupported claims: `{quality_gate.get('unsupported_claim_count', 0)}`")
+            diagnostics.append(f"- Quality gate redaction status: `{quality_gate.get('redaction_status', 'unknown')}`")
         if parser_diagnostics.get("repair_skipped_reason"):
             diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
         if "repair_succeeded" in parser_diagnostics:
@@ -234,8 +245,16 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
 ```
 """
 
+    quality_gate = (runner_diagnostics.get("parser") or {}).get("quality_gate") or runner_diagnostics.get("quality_gate") or {}
     warning = ""
-    if truncated:
+    if quality_gate.get("publish_decision") == "fail_before_publish":
+        markdown = "Cursor review output was not published because the deterministic quality gate blocked it before publishing."
+    elif quality_gate.get("publish_decision") == "publish_partial":
+        reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
+        warning = f"\n> **Partial Cursor Review**: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
+    elif quality_gate.get("publish_decision") == "suppress_findings":
+        warning = "\n> Findings were suppressed by the deterministic output quality gate; see diagnostics for the suppression reason.\n"
+    elif truncated:
         reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
         warning = f"\n> Note: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
 

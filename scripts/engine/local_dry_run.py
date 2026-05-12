@@ -10,6 +10,8 @@ from .findings import postprocess_findings_json
 from .grounding import ground_findings_json
 from .parser import parse_agent_output_result
 from .prompts import build_prompt, prompt_template_version
+from .quality_gate import evaluate_output_quality
+from .redaction import combine_results, redact_text
 from .render import render_comment
 from .schemas import SCHEMA_VERSION
 
@@ -111,7 +113,10 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
         parser_diagnostics["dry_run_output_path"] = output["path"]
 
     budgets = normalized_budget_settings(settings)
-    ci_policy = evaluate_ci_policy(0, findings_json, settings)
+    markdown_redaction = redact_text(parse_result.markdown)
+    findings_redaction = redact_text(findings_json)
+    output_redaction = redact_text(output["raw_output"])
+    redaction_summary = combine_results([markdown_redaction, findings_redaction, output_redaction])
     runner_diagnostics = {
         "runner": "local_dry_run",
         "failure_kind": "none",
@@ -121,15 +126,31 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
         "max_cursor_calls": budgets["max_cursor_calls"],
         "cursor_contacted": False,
         "parser": parser_diagnostics,
-        "ci_policy": ci_policy,
+        "redaction": redaction_summary,
         "dry_run": {
             "enabled": True,
             "output_source": output["source"],
             "output_path": output["path"],
         },
     }
+    quality_result = evaluate_output_quality(
+        markdown_redaction.text,
+        findings_redaction.text,
+        0,
+        parse_result.parsed_ok,
+        context.truncated,
+        context.meta,
+        settings,
+        runner_diagnostics,
+        redaction_summary,
+    )
+    findings_json = quality_result.findings_json
+    parser_diagnostics["quality_gate"] = quality_result.diagnostics
+    runner_diagnostics["quality_gate"] = quality_result.diagnostics
+    ci_policy = evaluate_ci_policy(0, findings_json, settings)
+    runner_diagnostics["ci_policy"] = ci_policy
     rendered = render_comment(
-        parse_result.markdown,
+        markdown_redaction.text,
         findings_json,
         0,
         "",
@@ -155,7 +176,7 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
         rendered=rendered,
         findings_json=findings_json,
         prompt=prompt,
-        raw_output=output["raw_output"],
+        raw_output=output_redaction.text,
         parsed_ok=parse_result.parsed_ok,
         diff_truncated=context.truncated,
         ci_policy=ci_policy,

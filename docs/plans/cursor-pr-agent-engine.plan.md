@@ -142,7 +142,7 @@ todos:
     status: completed
   - id: output-quality-gate
     content: 在 render/publish 前统一执行 schema、grounding、taxonomy、confidence、dedup、redaction、unsupported-claim 质量门禁并产出 publish decision
-    status: pending
+    status: completed
   - id: docs-positioning
     content: 更新 README，说明 clean-room PR-Agent-inspired architecture 与 Cursor-native 优势
     status: pending

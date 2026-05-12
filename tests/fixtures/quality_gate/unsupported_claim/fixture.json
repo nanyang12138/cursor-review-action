@@ -1,0 +1,54 @@
+{
+  "name": "unsupported_claim",
+  "capability_ids": [
+    "OUTPUT-QUALITY-GATE-P0",
+    "FINDING-GROUNDING-P0",
+    "FINDING-DEDUP-P0",
+    "SEC-PRIVACY-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "tests",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/tests/test_app.py b/tests/test_app.py\n@@ -10,3 +10,4 @@ def test_flag():\n     value = load_flag()\n+    if value:\n+        return True\n",
+    "stat": " tests/test_app.py | 2 ++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "tests/test_app.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "tests/test_app.py",
+          "bytes": 151,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": []
+    }
+  },
+  "agent_output": "<review_markdown>The new test branch lacks an assertion.</review_markdown>\n<findings_json>[{\"severity\":\"high\",\"confidence\":\"high\",\"category\":\"test_gap\",\"file\":\"tests/test_app.py\",\"line\":12,\"title\":\"Tests passed but assertion is missing\",\"body\":\"All tests passed, but this branch returns without asserting behavior.\",\"suggestion\":\"Assert the expected flag behavior instead of returning early.\",\"evidence\":\"if value:\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "rendered_contains": [
+      "Quality gate schema: `output-quality-gate/v1`",
+      "Quality gate decision: `suppress_findings`",
+      "Quality gate unsupported claims: `1`",
+      "Findings were suppressed by the deterministic output quality gate"
+    ],
+    "findings_json_contains": [
+      "\"unsupported_claim\": true",
+      "\"suppression_reason\": \"unsupported_claim\"",
+      "\"quality_gate_status\": \"suppressed\"",
+      "\"publishable\": false"
+    ]
+  }
+}
