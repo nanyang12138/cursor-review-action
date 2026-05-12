@@ -29,13 +29,13 @@ readiness. It is intentionally not a public claim of full PR-Agent parity.
 | COMPARISON-PROTOCOL-P1 | P1 | Implemented in `docs/parity-reports/README.md`, `template.md`, and initial gap log | `tests/test_engine.py::ComparisonProtocolTests` | Gap log requires release impact and backlog/deferred/non-goal decisions | No for protocol; sample volume remains a release gate | Initial suite maps 5 repository-owned samples and 6 gaps without copying PR-Agent output. |
 | TRACEABILITY-SCORECARD-P0 | P0 | Implemented in this scorecard and validated by unit tests | `tests/test_engine.py::FixtureRegressionTests` scorecard coverage test | Capability IDs now connect fixture evidence to release blockers | No | Keep this file updated with each capability PR. |
 | PROMPT-GOVERNANCE-P1 | P1 | Implemented in `docs/prompt-governance.md`, `scripts/engine/prompt_templates/VERSION`, and prompt diagnostics | `tests/test_engine.py::PromptParserRenderTests` prompt version and template contract tests | Prompt template version is included in prompt and PR comment diagnostics | No for governance; dogfooding metrics still feed later release gates | Prompt changes now have a checklist, metrics, fixture update rules, and clean-room guardrails. |
+| REPO-GUIDANCE-P1 | P1 | Implemented in `scripts/engine/guidance.py`, `scripts/engine/context.py`, and `scripts/engine/prompts.py` | `tests/test_engine.py::RepoGuidanceTests`; `docs/repo-guidance.md` | Prompt diagnostics include loaded/skipped guidance metadata; rendered comments show file names and budget usage without guidance body | No for P1; add concrete repo-guidance fixture before v1 | Loads `.cursor-review-instructions.md` for all commands and `best_practices.md` for `/cursor-improve` within repo-relative byte/line budgets. |
 
 ## Current release blockers
 
 These blockers are not failures of the scorecard itself; they are remaining final
 product gates from `docs/plans/cursor-pr-agent-engine.plan.md`.
 
-- `repo-guidance`: `.cursor-review-instructions.md` / `best_practices.md` injection is not implemented.
 - `local-dry-run`: no dedicated local dry-run command or documentation exists yet.
 - `privacy-logging`: redaction policy and token-like diagnostic safeguards are incomplete.
 - `review-lifecycle`: final lifecycle state diagnostics exist but lifecycle documentation and state model are incomplete.

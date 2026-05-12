@@ -28,6 +28,13 @@ DEFAULTS: Dict[str, Any] = {
     "commit_messages": "",
     "include_patterns": "",
     "exclude_patterns": "",
+    "guidance_enabled": True,
+    "guidance_files": {
+        "general": ".cursor-review-instructions.md",
+        "improve": "best_practices.md",
+    },
+    "guidance_max_bytes": 20000,
+    "guidance_max_lines": 400,
     "fail_on_error": False,
     "fail_on_findings": False,
     "trigger_phrase": "/cursor-review",
@@ -80,40 +87,62 @@ def parse_scalar(value: str) -> Any:
     return raw
 
 
+def _clean_config_line(line: str) -> str:
+    return line.split("#", 1)[0].rstrip()
+
+
 def load_simple_yaml(path: Path) -> Dict[str, Any]:
-    """Load a deliberately small YAML subset: key: value plus simple lists."""
+    """Load a deliberately small YAML subset: scalars, lists, and one-level maps."""
     if not path.exists():
         return {}
 
     config: Dict[str, Any] = {}
-    current_key = None
-    current_list: List[str] = []
+    lines = [_clean_config_line(line) for line in path.read_text(encoding="utf-8", errors="replace").splitlines()]
+    index = 0
 
-    for original_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = original_line.split("#", 1)[0].rstrip()
+    while index < len(lines):
+        line = lines[index]
         if not line.strip():
+            index += 1
             continue
-
-        if current_key and line.lstrip().startswith("- "):
-            current_list.append(parse_scalar(line.lstrip()[2:]))
+        if line.startswith((" ", "\t")):
+            index += 1
             continue
-        if current_key:
-            config[current_key] = current_list
-            current_key = None
-            current_list = []
 
         if ":" not in line:
+            index += 1
             continue
         key, value = line.split(":", 1)
         key = normalize_key(key)
-        if value.strip() == "":
-            current_key = key
-            current_list = []
-        else:
+        if value.strip():
             config[key] = parse_scalar(value)
+            index += 1
+            continue
 
-    if current_key:
-        config[current_key] = current_list
+        nested_lines: List[str] = []
+        index += 1
+        while index < len(lines):
+            nested_line = lines[index]
+            if not nested_line.strip():
+                index += 1
+                continue
+            if not nested_line.startswith((" ", "\t")):
+                break
+            nested_lines.append(nested_line.strip())
+            index += 1
+
+        if not nested_lines:
+            config[key] = []
+        elif all(item.startswith("- ") for item in nested_lines):
+            config[key] = [parse_scalar(item[2:]) for item in nested_lines]
+        else:
+            nested_map: Dict[str, Any] = {}
+            for item in nested_lines:
+                if ":" not in item:
+                    continue
+                nested_key, nested_value = item.split(":", 1)
+                nested_map[normalize_key(nested_key)] = parse_scalar(nested_value)
+            config[key] = nested_map
 
     return config
 
@@ -169,6 +198,9 @@ def load_settings() -> Dict[str, Any]:
     settings["max_hunks"] = max(to_int(settings.get("max_hunks"), DEFAULTS["max_hunks"]), 0)
     settings["max_cursor_calls"] = max(to_int(settings.get("max_cursor_calls"), DEFAULTS["max_cursor_calls"]), 1)
     settings["timeout_seconds"] = max(to_int(settings.get("timeout_seconds"), DEFAULTS["timeout_seconds"]), 1)
+    settings["guidance_enabled"] = to_bool(settings.get("guidance_enabled"))
+    settings["guidance_max_bytes"] = max(to_int(settings.get("guidance_max_bytes"), DEFAULTS["guidance_max_bytes"]), 0)
+    settings["guidance_max_lines"] = max(to_int(settings.get("guidance_max_lines"), DEFAULTS["guidance_max_lines"]), 0)
     settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
     settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
     settings["cursor_api_key_present"] = bool(env("CURSOR_API_KEY").strip())

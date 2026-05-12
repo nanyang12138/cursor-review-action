@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from .diff_selector import build_diff
+from .guidance import load_repo_guidance
 
 
 @dataclass
@@ -27,6 +28,7 @@ def _commit_messages(value: Any) -> List[str]:
 
 def build_pull_request_context(settings: Dict[str, Any], stat: str, diff_meta: Dict[str, Any]) -> Dict[str, Any]:
     files = [str(item) for item in diff_meta.get("files", [])]
+    guidance_diagnostics = (diff_meta.get("repo_guidance") or {}).get("diagnostics") or {}
     return {
         "pr_number": _clean_text(settings.get("pr_number")),
         "title": _clean_text(settings.get("pr_title")),
@@ -43,6 +45,10 @@ def build_pull_request_context(settings: Dict[str, Any], stat: str, diff_meta: D
         "diff_stat": _clean_text(stat),
         "repo_config": {
             "config_loaded": _clean_text(settings.get("config_loaded")),
+            "guidance_enabled": guidance_diagnostics.get("enabled", False),
+            "guidance_loaded_files": [
+                item.get("path") for item in guidance_diagnostics.get("loaded", []) if item.get("path")
+            ],
         },
     }
 
@@ -50,5 +56,7 @@ def build_pull_request_context(settings: Dict[str, Any], stat: str, diff_meta: D
 def build_review_context(settings: Dict[str, Any]) -> ReviewContext:
     diff_text, stat, truncated, meta = build_diff(settings)
     meta = dict(meta)
+    command = _clean_text(settings.get("resolved_command") or settings.get("command") or "review")
+    meta["repo_guidance"] = load_repo_guidance(settings, command)
     meta["pull_request_context"] = build_pull_request_context(settings, stat, meta)
     return ReviewContext(diff_text=diff_text, stat=stat, truncated=truncated, meta=meta)

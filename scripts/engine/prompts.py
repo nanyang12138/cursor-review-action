@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .config import split_csv
+from .guidance import format_guidance_for_prompt
 from .schemas import schema_text
 
 
@@ -43,6 +44,8 @@ def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any
 
 def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, truncated: bool, meta: Dict[str, Any], settings: Dict[str, Any]) -> str:
     pull_request_context = meta.get("pull_request_context", {})
+    repo_guidance = meta.get("repo_guidance") or {"sections": [], "diagnostics": {}}
+    guidance_prompt = format_guidance_for_prompt(repo_guidance)
     diagnostics = {
         "command": command,
         "prompt_template_version": prompt_template_version(),
@@ -52,9 +55,11 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
         "config_loaded": settings.get("config_loaded"),
         "command_arg_overrides": settings.get("command_arg_overrides", {}),
         "command_arg_warnings": settings.get("command_arg_warnings", []),
+        "repo_guidance": repo_guidance.get("diagnostics", {}),
         "diff_truncated": truncated,
         "diff_meta": meta,
     }
+    guidance_section = f"\nRepository guidance:\n{guidance_prompt}\n" if guidance_prompt else ""
     return f"""{command_instructions(command, user_prompt, settings)}
 
 Diagnostics:
@@ -62,6 +67,7 @@ Diagnostics:
 
 Pull request context:
 {json.dumps(pull_request_context, ensure_ascii=False, indent=2)}
+{guidance_section}
 
 Diff stat:
 {stat}

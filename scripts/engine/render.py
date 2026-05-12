@@ -98,6 +98,28 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Trigger reason: `{trigger_trust.get('reason', 'unknown')}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
+    repo_guidance = meta.get("repo_guidance") or {}
+    guidance_diagnostics = repo_guidance.get("diagnostics") or {}
+    if guidance_diagnostics:
+        loaded_guidance = guidance_diagnostics.get("loaded") or []
+        skipped_guidance = guidance_diagnostics.get("skipped") or []
+        diagnostics.append(f"- Repo guidance enabled: `{str(guidance_diagnostics.get('enabled', False)).lower()}`")
+        diagnostics.append(f"- Repo guidance bytes used: `{guidance_diagnostics.get('bytes_used', 0)}`")
+        diagnostics.append(
+            "- Repo guidance loaded files: `"
+            + (", ".join(item.get("path", "") for item in loaded_guidance if item.get("path")) or "none")
+            + "`"
+        )
+        if skipped_guidance:
+            diagnostics.append(
+                "- Repo guidance skipped files: `"
+                + ", ".join(
+                    f"{item.get('path', '')}:{item.get('reason', 'unknown')}"
+                    for item in skipped_guidance
+                    if item.get("path")
+                )
+                + "`"
+            )
     diagnostics.append(f"- Files reviewed: `{reviewed_count}`")
     diagnostics.append(f"- Files skipped: `{len(skipped_files)}`")
     pull_request_context = meta.get("pull_request_context") or {}
