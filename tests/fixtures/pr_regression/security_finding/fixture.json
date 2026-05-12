@@ -4,6 +4,7 @@
     "CMD-REVIEW-P0",
     "PROMPT-REVIEW-P0",
     "PARSER-FALLBACK-P0",
+    "FINDING-TAXONOMY-P0",
     "PUB-PERSISTENT-P0"
   ],
   "command": "review",
@@ -63,7 +64,13 @@
     "rendered_contains": [
       "Found a security issue in `app/auth.py`.",
       "Files reviewed: `1`",
-      "Findings JSON parsed: `true`"
+      "Findings JSON parsed: `true`",
+      "Taxonomy normalized findings: `1`"
+    ],
+    "findings_json_contains": [
+      "\"schema_version\": \"cursor-review-finding/v1\"",
+      "\"category\": \"security\"",
+      "\"noise_control\": \"actionable_review\""
     ]
   }
 }

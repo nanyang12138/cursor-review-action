@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Tuple
 
 from .schemas import schema_text
+from .taxonomy import apply_finding_taxonomy
 
 
 @dataclass
@@ -32,7 +33,7 @@ def _diagnostics(parsed_ok: bool, reason: str, detail: str = "") -> Dict[str, An
     return diagnostics
 
 
-def parse_agent_output_result(raw: str) -> ParseResult:
+def parse_agent_output_result(raw: str, command: str = "review") -> ParseResult:
     markdown = extract_tag(raw, "review_markdown") or raw.strip()
     findings_raw = extract_tag(raw, "findings_json")
 
@@ -40,8 +41,11 @@ def parse_agent_output_result(raw: str) -> ParseResult:
         try:
             parsed = json.loads(findings_raw)
             if isinstance(parsed, (dict, list)):
-                findings_raw = json.dumps(parsed, ensure_ascii=False, indent=2)
-                return ParseResult(markdown, findings_raw, True, _diagnostics(True, "valid_json"))
+                taxonomy_result = apply_finding_taxonomy(parsed, command)
+                findings_raw = json.dumps(taxonomy_result.payload, ensure_ascii=False, indent=2)
+                diagnostics = _diagnostics(True, "valid_json")
+                diagnostics["taxonomy"] = taxonomy_result.diagnostics
+                return ParseResult(markdown, findings_raw, True, diagnostics)
             return ParseResult(
                 markdown,
                 "[]",
@@ -72,6 +76,6 @@ Previous response to repair:
 """
 
 
-def parse_agent_output(raw: str) -> Tuple[str, str, bool]:
-    result = parse_agent_output_result(raw)
+def parse_agent_output(raw: str, command: str = "review") -> Tuple[str, str, bool]:
+    result = parse_agent_output_result(raw, command)
     return result.markdown, result.findings_json, result.parsed_ok
