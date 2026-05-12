@@ -1,0 +1,66 @@
+{
+  "name": "describe_summary",
+  "capability_ids": [
+    "CMD-DESCRIBE-P1",
+    "PROMPT-COMMAND-SCHEMA-P0",
+    "PARSER-COMMAND-SCHEMA-P1",
+    "PUB-PERSISTENT-P0"
+  ],
+  "command": "describe",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "enabled_commands": "review,describe"
+  },
+  "context": {
+    "diff_text": "diff --git a/scripts/parser.py b/scripts/parser.py\n@@ -1,3 +1,4 @@\n+return parse_json(raw)\n",
+    "stat": " scripts/parser.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "scripts/parser.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "scripts/parser.py",
+          "bytes": 88,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "105",
+        "title": "Parse structured output",
+        "body": "Adds JSON output parsing.",
+        "base_ref": "main",
+        "head_ref": "feature/parser",
+        "commit_messages": [
+          "Add JSON parser"
+        ],
+        "changed_files": [
+          "scripts/parser.py"
+        ],
+        "diff_stat": "scripts/parser.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Summary: adds structured output parsing for Cursor responses.</review_markdown>\n<findings_json>{\"schema_version\":\"cursor-review-action/v1\",\"command\":\"describe\",\"summary\":\"Adds structured output parsing.\",\"walkthrough\":[\"scripts/parser.py parses JSON output.\"],\"risks\":[\"Invalid model output still needs fallback coverage.\"],\"tests\":[\"Fixture regression should cover parser output.\"],\"changelog\":\"\"}</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "object",
+    "prompt_contains": [
+      "comment-only summary",
+      "\"command\": \"describe\"",
+      "\"walkthrough\""
+    ],
+    "markdown_contains": [
+      "Summary: adds structured output parsing"
+    ],
+    "rendered_contains": [
+      "Summary: adds structured output parsing for Cursor responses.",
+      "Command: `describe`",
+      "Files reviewed: `1`"
+    ]
+  }
+}

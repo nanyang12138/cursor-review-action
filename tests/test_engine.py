@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, parser, prompts, render, runner, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, parser, prompts, render, runner, run_state, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -71,6 +71,45 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(result.overrides, {})
         self.assertEqual(result.user_prompt, "Check this.")
         self.assertEqual(result.warnings, ["--max-findings must be an integer and was ignored."])
+
+
+class RunStateTests(unittest.TestCase):
+    def test_comment_contract_is_command_specific(self) -> None:
+        self.assertEqual(run_state.comment_marker("ask"), "<!-- cursor-review-action:ask -->")
+        self.assertEqual(run_state.comment_title("ask"), "Cursor Ask")
+        self.assertEqual(run_state.comment_marker("../Review!"), "<!-- cursor-review-action:review -->")
+
+    def test_run_metadata_records_event_head_and_idempotency(self) -> None:
+        metadata = run_state.build_run_metadata(
+            {
+                "resolved_command": "review",
+                "command_prompt_source": "slash_command",
+                "event_name": "pull_request",
+                "pr_number": "42",
+                "base_sha": "base",
+                "head_sha": "head",
+                "expected_head_sha": "other",
+            },
+            env={
+                "GITHUB_RUN_ID": "1001",
+                "GITHUB_RUN_ATTEMPT": "2",
+                "GITHUB_REPOSITORY": "owner/repo",
+            },
+        )
+
+        self.assertEqual(metadata["schema_version"], "run-state/v1")
+        self.assertEqual(metadata["event_name"], "pull_request")
+        self.assertEqual(metadata["head_sha"], "head")
+        self.assertEqual(metadata["stale_status"], "stale")
+        self.assertEqual(metadata["idempotency_key"], "cursor-review-action:review:42:head")
+
+    def test_metadata_comment_is_hidden_and_json_parseable(self) -> None:
+        metadata = {"schema_version": "run-state/v1", "command": "describe"}
+        comment = run_state.metadata_comment(metadata)
+
+        self.assertTrue(comment.startswith("<!-- cursor-review-action-meta:"))
+        payload = comment.removeprefix("<!-- cursor-review-action-meta:").removesuffix(" -->")
+        self.assertEqual(json.loads(payload), metadata)
 
 
 class ConfigTests(unittest.TestCase):
@@ -494,6 +533,38 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Commit messages provided: `1`", rendered)
         self.assertNotIn("Sensitive body", rendered)
 
+    def test_render_comment_includes_run_state_diagnostics(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {
+                "resolved_command": "review",
+                "model": "auto",
+                "filter_mode": "added",
+                "run_state": {
+                    "schema_version": "run-state/v1",
+                    "generated_at": "2026-05-12T10:20:00Z",
+                    "event_name": "pull_request",
+                    "command_source": "slash_command",
+                    "run_id": "1001",
+                    "run_attempt": "2",
+                    "base_sha": "base",
+                    "head_sha": "head",
+                    "stale_status": "unknown",
+                    "idempotency_key": "cursor-review-action:review:42:head",
+                },
+            },
+        )
+
+        self.assertIn("Run state schema: `run-state/v1`", rendered)
+        self.assertIn("Head SHA: `head`", rendered)
+        self.assertIn("Idempotency key: `cursor-review-action:review:42:head`", rendered)
+
     def test_render_trigger_skip_reports_policy_without_raw_prompt(self) -> None:
         rendered = render.render_trigger_skip(
             {
@@ -579,6 +650,34 @@ class TriggerTrustPolicyTests(unittest.TestCase):
 
         self.assertTrue(decision.allowed)
         self.assertEqual(decision.reason, "trusted_issue_comment_command")
+
+
+class FixtureRegressionTests(unittest.TestCase):
+    def test_pr_regression_fixtures_match_prompt_parser_render_contract(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        fixture_paths = fixtures.discover_fixture_paths(fixture_root)
+
+        self.assertGreaterEqual(len(fixture_paths), 5)
+        for fixture_path in fixture_paths:
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                result = fixtures.run_fixture(fixture)
+
+                self.assertEqual(fixtures.validate_fixture(fixture, result), [])
+
+    def test_pr_regression_fixtures_have_capability_trace_files(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                capabilities_path = fixture_path.parent / "capabilities.txt"
+                self.assertTrue(capabilities_path.exists())
+                capabilities = [
+                    line.strip()
+                    for line in capabilities_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                self.assertEqual(capabilities, fixture["capability_ids"])
 
 
 class RunnerContractTests(unittest.TestCase):
@@ -693,6 +792,8 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("No issues found.", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
+            self.assertIn("comment_marker", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
+            self.assertIn("run_metadata_json", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             prompt = run_cursor.call_args.args[0]
             self.assertIn("Maximum findings: 2.", prompt)
             self.assertIn("Review focus: security, tests.", prompt)

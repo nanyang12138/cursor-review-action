@@ -70,10 +70,10 @@ todos:
     status: completed
   - id: run-state
     content: 增加 command-specific markers、run metadata、stale-run diagnostics 和幂等更新策略
-    status: pending
+    status: completed
   - id: fixtures
     content: 建立 fixture PR regression harness，覆盖主要 review 场景
-    status: pending
+    status: completed
   - id: comparison-protocol
     content: 建立 PR-Agent comparison protocol，把样例 PR 差距转成 backlog 或 explicit non-goal
     status: pending
