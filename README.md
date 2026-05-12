@@ -503,7 +503,8 @@ Options:
 - Very large PRs may be partially reviewed if the diff is truncated.
 - Inline comments are not enabled yet.
 - It does not implement auto-fix; does not implement labels; does not implement
-  ticket integration, GitHub App identity, or multi-platform provider support.
+  ticket integration or GitHub App identity; and does not implement
+  multi-platform provider support.
 - It does not claim full PR-Agent product parity; it tracks implemented
   clean-room behavioral parity through capability IDs and fixtures.
 
