@@ -91,7 +91,7 @@ todos:
     status: completed
   - id: incremental-scope
     content: 定义 full PR selected diff 默认模式，并将 command-scoped/incremental review 作为 opt-in 能力
-    status: pending
+    status: completed
   - id: help-discoverability
     content: 增加 README 命令文档，后续提供 /cursor-help 或 /cursor-review help
     status: pending

@@ -15,6 +15,7 @@ Token = Tuple[str, int, int]
 
 
 FOCUS_VALUE_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+SCOPE_FILE_VALUE_RE = re.compile(r"^[A-Za-z0-9._/@:+*?\[\]-]+$")
 MAX_FINDINGS_MIN = 1
 MAX_FINDINGS_MAX = 50
 
@@ -95,6 +96,34 @@ def _parse_max_findings(value: Optional[str]) -> Tuple[Optional[int], Optional[s
     return parsed, None
 
 
+def _parse_scope(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    if value is None or value.strip() == "":
+        return None, "--scope requires `full` or `files`."
+    parsed = value.strip().lower().replace("-", "_")
+    if parsed in {"full", "all"}:
+        return "full", None
+    if parsed in {"file", "files", "command_files", "command_scoped", "command_scope"}:
+        return "files", None
+    if parsed == "incremental":
+        return "full", "--scope incremental is not supported yet; full selected diff will be reviewed."
+    return None, "--scope supports only `full` or `files` and was ignored."
+
+
+def _parse_scope_files(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    if value is None or value.strip() == "":
+        return None, "--files requires a comma-separated list of repository-relative paths or globs."
+
+    items = [item.strip().lstrip("/") for item in value.split(",") if item.strip()]
+    if not items:
+        return None, "--files requires at least one repository-relative path or glob."
+    if any(".." in item.split("/") for item in items):
+        return None, "--files accepts only repository-relative paths and globs."
+    invalid = [item for item in items if not SCOPE_FILE_VALUE_RE.fullmatch(item)]
+    if invalid:
+        return None, "--files contains unsupported characters and was ignored."
+    return ",".join(items), None
+
+
 def parse_command_args(command: str, text: str) -> CommandArgParseResult:
     """Parse a small allowlist of leading slash-command arguments.
 
@@ -135,6 +164,31 @@ def parse_command_args(command: str, text: str) -> CommandArgParseResult:
             else:
                 overrides["max_findings"] = parsed_max
                 parsed_args.append("--max-findings")
+            index = next_index
+            consumed_end = value_end
+            continue
+
+        if name == "scope":
+            raw_value, next_index, value_end = _read_value(tokens, index, inline_value)
+            parsed_scope, warning = _parse_scope(raw_value)
+            if warning:
+                warnings.append(warning)
+            if parsed_scope:
+                overrides["scope_mode"] = parsed_scope
+                parsed_args.append("--scope")
+            index = next_index
+            consumed_end = value_end
+            continue
+
+        if name in {"files", "scope_files"}:
+            raw_value, next_index, value_end = _read_value(tokens, index, inline_value)
+            parsed_files, warning = _parse_scope_files(raw_value)
+            if warning:
+                warnings.append(warning)
+            else:
+                overrides["scope_mode"] = "files"
+                overrides["scope_files"] = parsed_files
+                parsed_args.append("--files")
             index = next_index
             consumed_end = value_end
             continue

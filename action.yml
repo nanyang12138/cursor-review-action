@@ -134,6 +134,14 @@ inputs:
     description: "Comma-separated file globs to exclude."
     required: false
     default: ""
+  scope-mode:
+    description: "Review scope mode: full or files. Defaults to the full selected PR diff."
+    required: false
+    default: "full"
+  scope-files:
+    description: "Comma-separated repository-relative paths or globs when scope-mode is files."
+    required: false
+    default: ""
   persistent-comment:
     description: "Update the previous Cursor Review comment instead of creating a new one."
     required: false
@@ -221,6 +229,8 @@ runs:
         INPUT_FILTER_MODE: ${{ inputs.filter-mode }}
         INPUT_INCLUDE_PATTERNS: ${{ inputs.include-patterns }}
         INPUT_EXCLUDE_PATTERNS: ${{ inputs.exclude-patterns }}
+        INPUT_SCOPE_MODE: ${{ inputs.scope-mode }}
+        INPUT_SCOPE_FILES: ${{ inputs.scope-files }}
         INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
         INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
       run: python3 "$GITHUB_ACTION_PATH/scripts/cursor_review.py"

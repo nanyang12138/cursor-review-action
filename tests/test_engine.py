@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, parser, prompts, render, runner, run_state, taxonomy, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, fixtures, guidance, parser, prompts, render, runner, run_state, scope, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -71,6 +71,27 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(result.overrides, {})
         self.assertEqual(result.user_prompt, "Check this.")
         self.assertEqual(result.warnings, ["--max-findings must be an integer and was ignored."])
+
+    def test_command_args_apply_file_scope_without_shell_parsing(self) -> None:
+        result = command_args.parse_command_args(
+            "review",
+            "--files src/app.py,tests/*.py --scope=full Check this.",
+        )
+
+        self.assertEqual(result.overrides, {"scope_mode": "full", "scope_files": "src/app.py,tests/*.py"})
+        self.assertEqual(result.parsed_args, ["--files", "--scope"])
+        self.assertEqual(result.user_prompt, "Check this.")
+        self.assertEqual(result.warnings, [])
+
+    def test_command_args_reject_incremental_scope_as_deferred(self) -> None:
+        result = command_args.parse_command_args("review", "--scope incremental Check this.")
+
+        self.assertEqual(result.overrides, {"scope_mode": "full"})
+        self.assertEqual(result.user_prompt, "Check this.")
+        self.assertEqual(
+            result.warnings,
+            ["--scope incremental is not supported yet; full selected diff will be reviewed."],
+        )
 
 
 class RunStateTests(unittest.TestCase):
@@ -173,6 +194,8 @@ guidance_max_bytes: 1024
             "INPUT_MAX_HUNKS": "9",
             "INPUT_MAX_CURSOR_CALLS": "1",
             "INPUT_TIMEOUT_SECONDS": "30",
+            "INPUT_SCOPE_MODE": "files",
+            "INPUT_SCOPE_FILES": "src/*.py,tests/*.py",
             "CURSOR_API_KEY": "test-key",
         }
 
@@ -192,6 +215,8 @@ guidance_max_bytes: 1024
         self.assertEqual(settings["max_hunks"], 9)
         self.assertEqual(settings["max_cursor_calls"], 1)
         self.assertEqual(settings["timeout_seconds"], 30)
+        self.assertEqual(settings["scope_mode"], "files")
+        self.assertEqual(settings["scope_files"], "src/*.py,tests/*.py")
 
 
 class ContextBuilderTests(unittest.TestCase):
@@ -335,6 +360,57 @@ class RepoGuidanceTests(unittest.TestCase):
         self.assertIn('".cursor-review-instructions.md"', prompt)
 
 
+class ReviewScopeTests(unittest.TestCase):
+    def test_default_scope_reviews_full_selected_diff(self) -> None:
+        files, skipped, diagnostics = scope.apply_review_scope(
+            ["src/app.py", "tests/test_app.py"],
+            {},
+        )
+
+        self.assertEqual(files, ["src/app.py", "tests/test_app.py"])
+        self.assertEqual(skipped, [])
+        self.assertEqual(diagnostics["schema_version"], scope.SCOPE_SCHEMA_VERSION)
+        self.assertEqual(diagnostics["mode"], "full")
+        self.assertEqual(diagnostics["reason"], "full_selected_diff")
+
+    def test_file_scope_filters_changed_files_with_diagnostics(self) -> None:
+        files, skipped, diagnostics = scope.apply_review_scope(
+            ["src/app.py", "docs/readme.md", "tests/test_app.py"],
+            {"scope_mode": "files", "scope_files": "src/*.py,tests/test_app.py"},
+        )
+
+        self.assertEqual(files, ["src/app.py", "tests/test_app.py"])
+        self.assertEqual(skipped, [{"path": "docs/readme.md", "reason": "scope_not_requested"}])
+        self.assertEqual(diagnostics["mode"], "files")
+        self.assertEqual(diagnostics["reason"], "command_scoped_files")
+        self.assertEqual(diagnostics["selected_file_count"], 2)
+        self.assertEqual(diagnostics["skipped_file_count"], 1)
+
+    def test_file_scope_with_no_match_is_explicit(self) -> None:
+        files, skipped, diagnostics = scope.apply_review_scope(
+            ["src/app.py"],
+            {"scope_mode": "files", "scope_files": "docs/**"},
+        )
+
+        self.assertEqual(files, [])
+        self.assertEqual(skipped, [{"path": "src/app.py", "reason": "scope_not_requested"}])
+        self.assertIn("File-scoped review matched no changed files.", diagnostics["warnings"])
+
+    def test_incremental_scope_is_deferred_to_full_review(self) -> None:
+        files, skipped, diagnostics = scope.apply_review_scope(
+            ["src/app.py"],
+            {"scope_mode": "incremental"},
+        )
+
+        self.assertEqual(files, ["src/app.py"])
+        self.assertEqual(skipped, [])
+        self.assertEqual(diagnostics["mode"], "full")
+        self.assertIn(
+            "Incremental since-last-run scope is not supported yet; reviewing the full selected PR diff.",
+            diagnostics["warnings"],
+        )
+
+
 class DiffSelectorTests(unittest.TestCase):
     def test_build_diff_records_reviewed_and_budget_skipped_files(self) -> None:
         def fake_file_diff(file_name: str, *_args: object) -> str:
@@ -368,6 +444,31 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertFalse(truncated)
         self.assertEqual([item["path"] for item in meta["reviewed_files"]], ["src/a.py"])
         self.assertEqual(meta["skipped_files"], [{"path": "dist/b.js", "reason": "excluded"}])
+
+    def test_build_diff_applies_command_file_scope_before_budget(self) -> None:
+        def fake_file_diff(file_name: str, *_args: object) -> str:
+            return f"diff --git a/{file_name} b/{file_name}\n+small\n"
+
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(diff_selector, "changed_files", return_value=["src/a.py", "docs/readme.md", "tests/test_a.py"]):
+                with mock.patch.object(diff_selector, "_file_diff", side_effect=fake_file_diff):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        diff_text, _stat, truncated, meta = diff_selector.build_diff(
+                            {
+                                "max_diff_bytes": 120000,
+                                "scope_mode": "files",
+                                "scope_files": "src/*.py,tests/*.py",
+                            }
+                        )
+
+        self.assertFalse(truncated)
+        self.assertIn("src/a.py", diff_text)
+        self.assertIn("tests/test_a.py", diff_text)
+        self.assertNotIn("docs/readme.md", diff_text)
+        self.assertEqual(meta["files"], ["src/a.py", "tests/test_a.py"])
+        self.assertEqual(meta["skipped_files"], [{"path": "docs/readme.md", "reason": "scope_not_requested"}])
+        self.assertEqual(meta["scope"]["mode"], "files")
+        self.assertEqual(meta["scope"]["reason"], "command_scoped_files")
 
     def test_build_diff_applies_max_files_budget(self) -> None:
         with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
@@ -738,6 +839,32 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Repo guidance loaded files: `.cursor-review-instructions.md`", rendered)
         self.assertIn("best_practices.md:command_not_applicable", rendered)
         self.assertNotIn("Do not leak this guidance body.", rendered)
+
+    def test_render_comment_reports_review_scope_diagnostics(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {
+                "files": ["src/app.py"],
+                "scope": {
+                    "schema_version": scope.SCOPE_SCHEMA_VERSION,
+                    "mode": "files",
+                    "reason": "command_scoped_files",
+                    "selected_file_count": 1,
+                    "skipped_file_count": 2,
+                    "warnings": [],
+                },
+            },
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("Review scope schema: `review-scope/v1`", rendered)
+        self.assertIn("Review scope mode: `files`", rendered)
+        self.assertIn("Review scope skipped files: `2`", rendered)
 
     def test_render_comment_includes_run_state_diagnostics(self) -> None:
         rendered = render.render_comment(

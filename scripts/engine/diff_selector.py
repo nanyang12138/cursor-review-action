@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple
 from .budget import normalized_budget_settings
 from .config import split_csv
 from .runner import run_command
+from .scope import apply_review_scope
 
 
 def diff_range(settings: Dict[str, Any]) -> Tuple[str, str, str]:
@@ -170,7 +171,9 @@ def _select_diff_chunks(files: List[str], settings: Dict[str, Any], base: str, h
 def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]]:
     base, head, range_label = diff_range(settings)
     all_files = changed_files(base, head)
-    files, skipped_files = classify_files(all_files, settings)
+    scoped_files, scope_skipped_files, scope_diagnostics = apply_review_scope(all_files, settings)
+    files, skipped_files = classify_files(scoped_files, settings)
+    skipped_files = scope_skipped_files + skipped_files
     files, file_budget_skipped = _apply_file_budget(files, settings)
     skipped_files.extend(file_budget_skipped)
     budgets = normalized_budget_settings(settings)
@@ -187,12 +190,13 @@ def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]
             "changed_files": all_files,
             "reviewed_files": [],
             "skipped_files": skipped_files,
+            "scope": scope_diagnostics,
             "filter_mode": filter_mode,
             "budget": budgets,
             "truncation_reasons": truncation_reasons,
         }
 
-    stat_cmd = ["git", "diff", "--stat", range_label, "--"] + files if base else ["git", "show", "--stat", "--format=", "HEAD"]
+    stat_cmd = ["git", "diff", "--stat", range_label, "--"] + files if base else ["git", "show", "--stat", "--format=", "HEAD", "--"] + files
     stat = run_command(stat_cmd, check=False).stdout
 
     diff_text, truncated, diff_bytes, hunk_count, reviewed_files, budget_skipped_files, chunk_truncation_reasons = _select_diff_chunks(files, settings, base, head, range_label, filter_mode)
@@ -210,6 +214,7 @@ def build_diff(settings: Dict[str, Any]) -> Tuple[str, str, bool, Dict[str, Any]
         "changed_files": all_files,
         "reviewed_files": reviewed_files,
         "skipped_files": skipped_files,
+        "scope": scope_diagnostics,
         "filter_mode": filter_mode,
         "max_diff_bytes": max_bytes,
         "diff_bytes": diff_bytes,

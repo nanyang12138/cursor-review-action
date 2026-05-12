@@ -28,6 +28,8 @@ DEFAULTS: Dict[str, Any] = {
     "commit_messages": "",
     "include_patterns": "",
     "exclude_patterns": "",
+    "scope_mode": "full",
+    "scope_files": "",
     "guidance_enabled": True,
     "guidance_files": {
         "general": ".cursor-review-instructions.md",
@@ -183,6 +185,8 @@ def load_settings() -> Dict[str, Any]:
         "filter_mode": env("INPUT_FILTER_MODE", DEFAULTS["filter_mode"]),
         "include_patterns": env("INPUT_INCLUDE_PATTERNS", ""),
         "exclude_patterns": env("INPUT_EXCLUDE_PATTERNS", ""),
+        "scope_mode": env("INPUT_SCOPE_MODE", DEFAULTS["scope_mode"]),
+        "scope_files": env("INPUT_SCOPE_FILES", DEFAULTS["scope_files"]),
         "fail_on_error": env("INPUT_FAIL_ON_ERROR", "false"),
         "fail_on_findings": env("INPUT_FAIL_ON_FINDINGS", "false"),
     }
