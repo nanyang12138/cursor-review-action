@@ -13,6 +13,7 @@ DEFAULTS: Dict[str, Any] = {
     "review_focus": "correctness,security,performance,tests,edge-cases",
     "max_findings": 5,
     "max_diff_bytes": 120000,
+    "timeout_seconds": 600,
     "filter_mode": "added",
     "include_patterns": "",
     "exclude_patterns": "",
@@ -125,6 +126,7 @@ def load_settings() -> Dict[str, Any]:
         "review_focus": env("INPUT_REVIEW_FOCUS", DEFAULTS["review_focus"]),
         "max_findings": env("INPUT_MAX_FINDINGS", str(DEFAULTS["max_findings"])),
         "max_diff_bytes": env("INPUT_MAX_DIFF_BYTES", str(DEFAULTS["max_diff_bytes"])),
+        "timeout_seconds": env("INPUT_TIMEOUT_SECONDS", str(DEFAULTS["timeout_seconds"])),
         "filter_mode": env("INPUT_FILTER_MODE", DEFAULTS["filter_mode"]),
         "include_patterns": env("INPUT_INCLUDE_PATTERNS", ""),
         "exclude_patterns": env("INPUT_EXCLUDE_PATTERNS", ""),
@@ -139,6 +141,7 @@ def load_settings() -> Dict[str, Any]:
 
     settings["max_findings"] = to_int(settings.get("max_findings"), DEFAULTS["max_findings"])
     settings["max_diff_bytes"] = to_int(settings.get("max_diff_bytes"), DEFAULTS["max_diff_bytes"])
+    settings["timeout_seconds"] = to_int(settings.get("timeout_seconds"), DEFAULTS["timeout_seconds"])
     settings["fail_on_error"] = to_bool(settings.get("fail_on_error"))
     settings["fail_on_findings"] = to_bool(settings.get("fail_on_findings"))
     settings["config_loaded"] = str(config_path if config_path.exists() else "")

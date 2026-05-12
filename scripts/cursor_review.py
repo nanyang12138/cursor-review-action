@@ -8,7 +8,7 @@ from engine.config import load_settings
 from engine.parser import parse_agent_output
 from engine.prompts import build_prompt
 from engine.render import render_comment, set_output, write_step_summary
-from engine.runner import run_cursor
+from engine.runner import run_cursor_result
 
 
 def main() -> int:
@@ -39,7 +39,10 @@ def main() -> int:
     )
     Path("cursor_review_prompt.txt").write_text(prompt, encoding="utf-8")
 
-    exit_code, stdout, stderr = run_cursor(prompt, settings)
+    runner_result = run_cursor_result(prompt, settings)
+    exit_code = runner_result.exit_code
+    stdout = runner_result.raw_text
+    stderr = runner_result.stderr
     raw_output = stdout + ("\n\nSTDERR:\n" + stderr if stderr else "")
     Path("cursor_review_raw.txt").write_text(raw_output, encoding="utf-8")
 
@@ -53,6 +56,7 @@ def main() -> int:
         parsed_ok,
         context.meta,
         settings,
+        runner_result.diagnostics,
     )
     Path("cursor_review.md").write_text(rendered, encoding="utf-8")
     Path("findings.json").write_text(findings_json, encoding="utf-8")

@@ -1,11 +1,16 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
-def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: str, truncated: bool, parsed_ok: bool, meta: Dict[str, Any], settings: Dict[str, Any]) -> str:
+def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: str, truncated: bool, parsed_ok: bool, meta: Dict[str, Any], settings: Dict[str, Any], runner_diagnostics: Optional[Dict[str, Any]] = None) -> str:
+    runner_diagnostics = runner_diagnostics or {}
     diagnostics = [
         f"- Command: `{settings.get('resolved_command')}`",
         f"- Model: `{settings.get('model')}`",
+        f"- Runner: `{runner_diagnostics.get('runner', 'cursor_cli')}`",
+        f"- Runner failure kind: `{runner_diagnostics.get('failure_kind', 'none')}`",
+        f"- Runner timeout seconds: `{runner_diagnostics.get('timeout_seconds', settings.get('timeout_seconds', 600))}`",
+        f"- Runner retry count: `{runner_diagnostics.get('retry_count', 0)}`",
         f"- Filter mode: `{settings.get('filter_mode')}`",
         f"- Diff truncated: `{str(truncated).lower()}`",
         f"- Findings JSON parsed: `{str(parsed_ok).lower()}`",
