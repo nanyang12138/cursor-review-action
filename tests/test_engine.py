@@ -388,11 +388,29 @@ class PromptParserRenderTests(unittest.TestCase):
 <findings_json>{not valid}</findings_json>
 """
 
-        markdown, findings_json, parsed_ok = parser.parse_agent_output(raw)
+        result = parser.parse_agent_output_result(raw)
 
-        self.assertEqual(markdown, "Check this.")
-        self.assertEqual(findings_json, "{not valid}")
-        self.assertFalse(parsed_ok)
+        self.assertEqual(result.markdown, "Check this.")
+        self.assertEqual(json.loads(result.findings_json), [])
+        self.assertFalse(result.parsed_ok)
+        self.assertEqual(result.diagnostics["reason"], "invalid_json")
+        self.assertEqual(result.diagnostics["fallback"], "markdown")
+
+    def test_parse_agent_output_reports_missing_json_as_markdown_fallback(self) -> None:
+        result = parser.parse_agent_output_result("Plain markdown answer.")
+
+        self.assertEqual(result.markdown, "Plain markdown answer.")
+        self.assertEqual(json.loads(result.findings_json), [])
+        self.assertFalse(result.parsed_ok)
+        self.assertEqual(result.diagnostics["reason"], "missing_findings_json")
+
+    def test_build_repair_prompt_embeds_command_schema(self) -> None:
+        prompt = parser.build_repair_prompt("describe", "<review_markdown>Summary</review_markdown>")
+
+        self.assertIn("Repair the previous Cursor review response", prompt)
+        self.assertIn("<findings_json>...</findings_json>", prompt)
+        self.assertIn('"command": "describe"', prompt)
+        self.assertIn('"walkthrough"', prompt)
 
     def test_render_comment_includes_existing_diagnostics(self) -> None:
         rendered = render.render_comment(
@@ -670,6 +688,107 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("untrusted_author_association", rendered)
             self.assertIn("should_comment<<", outputs)
             self.assertIn("false", outputs)
+
+    def test_main_repairs_invalid_structured_output_when_budget_allows(self) -> None:
+        fake_context = context.ReviewContext(
+            diff_text="diff --git a/a.py b/a.py",
+            stat=" a.py | 1 +",
+            truncated=False,
+            meta={"files": ["a.py"]},
+        )
+        invalid_output = """
+<review_markdown>Check this.</review_markdown>
+<findings_json>{not valid}</findings_json>
+"""
+        repaired_output = """
+<review_markdown>Check this.</review_markdown>
+<findings_json>[{"severity":"low","file":"a.py","line":1,"title":"Check","body":"Body","confidence":"high"}]</findings_json>
+"""
+        first_result = runner.CursorRunResult(
+            raw_text=invalid_output,
+            exit_code=0,
+            stderr="",
+            duration_seconds=0.01,
+            retry_count=0,
+            failure_kind="none",
+            model="auto",
+            command_name="review",
+            timeout_seconds=600,
+            diagnostics={
+                "runner": "cursor_cli",
+                "command": "review",
+                "requested_model": "auto",
+                "exit_code": 0,
+                "failure_kind": "none",
+                "duration_seconds": 0.01,
+                "retry_count": 0,
+                "timeout_seconds": 600,
+                "max_cursor_calls": 2,
+                "cursor_calls_attempted": 1,
+            },
+        )
+        repair_result = runner.CursorRunResult(
+            raw_text=repaired_output,
+            exit_code=0,
+            stderr="",
+            duration_seconds=0.01,
+            retry_count=0,
+            failure_kind="none",
+            model="auto",
+            command_name="review",
+            timeout_seconds=600,
+            diagnostics={
+                "runner": "cursor_cli",
+                "command": "review",
+                "requested_model": "auto",
+                "exit_code": 0,
+                "failure_kind": "none",
+                "duration_seconds": 0.01,
+                "retry_count": 0,
+                "timeout_seconds": 600,
+                "max_cursor_calls": 2,
+                "cursor_calls_attempted": 1,
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "INPUT_COMMAND": "review",
+                "INPUT_ENABLED_COMMANDS": "review",
+                "INPUT_MAX_CURSOR_CALLS": "2",
+                "INPUT_CONFIG_PATH": str(Path(tmp) / "missing.yml"),
+                "INPUT_EVENT_NAME": "pull_request",
+                "INPUT_PR_IS_FORK": "false",
+                "CURSOR_API_KEY": "test-key",
+                "GITHUB_OUTPUT": str(Path(tmp) / "outputs.txt"),
+                "GITHUB_STEP_SUMMARY": str(Path(tmp) / "summary.md"),
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch.object(cursor_review, "build_review_context", return_value=fake_context):
+                    with mock.patch.object(
+                        cursor_review,
+                        "run_cursor_result",
+                        side_effect=[first_result, repair_result],
+                    ) as run_cursor:
+                        cwd = os.getcwd()
+                        os.chdir(tmp)
+                        try:
+                            exit_code = cursor_review.main()
+                        finally:
+                            os.chdir(cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(run_cursor.call_count, 2)
+            repair_prompt = run_cursor.call_args_list[1].args[0]
+            self.assertIn("Repair the previous Cursor review response", repair_prompt)
+            self.assertEqual(
+                json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8"))[0]["title"],
+                "Check",
+            )
+            rendered = (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8")
+            self.assertIn("Parser repair retry count: `1`", rendered)
+            self.assertIn("Parser repair succeeded: `true`", rendered)
+            self.assertIn("Cursor calls attempted: `2`", rendered)
 
 
 if __name__ == "__main__":

@@ -47,6 +47,15 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Findings JSON parsed: `{str(parsed_ok).lower()}`",
         f"- Cursor exit code: `{exit_code}`",
     ]
+    parser_diagnostics = runner_diagnostics.get("parser") or {}
+    if parser_diagnostics:
+        diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")
+        diagnostics.append(f"- Parser fallback: `{parser_diagnostics.get('fallback', 'unknown')}`")
+        diagnostics.append(f"- Parser repair retry count: `{parser_diagnostics.get('repair_retry_count', 0)}`")
+        if parser_diagnostics.get("repair_skipped_reason"):
+            diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
+        if "repair_succeeded" in parser_diagnostics:
+            diagnostics.append(f"- Parser repair succeeded: `{str(parser_diagnostics.get('repair_succeeded')).lower()}`")
     if budget:
         diagnostics.append(f"- Budget max diff bytes: `{budget.get('max_diff_bytes')}`")
         diagnostics.append(f"- Budget max files: `{budget.get('max_files')}`")
