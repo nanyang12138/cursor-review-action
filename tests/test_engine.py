@@ -1922,6 +1922,7 @@ class SupplyChainTests(unittest.TestCase):
     def test_release_and_dependency_docs_cover_required_supply_chain_gates(self) -> None:
         release_checklist = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
         dependencies = (ROOT / "docs" / "dependencies.md").read_text(encoding="utf-8")
+        release_notes = (ROOT / "docs" / "release-notes.md").read_text(encoding="utf-8")
 
         for doc in [release_checklist, dependencies]:
             self.assertIn("SUPPLY-CHAIN-P0", doc)
@@ -1932,6 +1933,29 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("nanyang12138/cursor-review-action@v1", release_checklist)
         self.assertIn("actions/github-script@v7", dependencies)
         self.assertIn("scripts/install-cursor.sh", dependencies)
+        self.assertIn("docs/release-notes.md", release_checklist)
+
+        for required in [
+            "Release tag",
+            "Target commit",
+            "Completed capability IDs",
+            "Verification evidence",
+            "Known limitations and deferred non-goals",
+            "Dependency and supply-chain notes",
+            "Security and privacy notes",
+            "Upgrade and compatibility notes",
+        ]:
+            self.assertIn(required, release_notes)
+        self.assertIn("SUPPLY-CHAIN-P0", release_notes)
+        self.assertIn("TRACEABILITY-SCORECARD-P0", release_notes)
+        self.assertIn("PARSER-COMMAND-SCHEMA-P1", release_notes)
+        self.assertIn("nanyang12138/cursor-review-action@v1", release_notes)
+        self.assertIn("actions/checkout@v4", release_notes)
+        self.assertIn("actions/github-script@v7", release_notes)
+        self.assertIn("no auto-merge, no auto-release, no tag creation", release_notes)
+        self.assertIn("Full inline comments or inline suggestions", release_notes)
+        self.assertIn("Full PR-Agent product equivalence claims", release_notes)
+        self.assertNotIn("auto-create release tags", release_notes.lower())
 
 
 class TriggerTrustPolicyTests(unittest.TestCase):
