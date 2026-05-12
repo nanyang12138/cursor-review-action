@@ -106,6 +106,22 @@ inputs:
     description: "Maximum diff bytes sent to Cursor."
     required: false
     default: "120000"
+  max-files:
+    description: "Maximum changed files to include in the selected diff. Use 0 for unlimited."
+    required: false
+    default: "0"
+  max-hunks:
+    description: "Maximum diff hunks to include in the selected diff. Use 0 for unlimited."
+    required: false
+    default: "0"
+  max-cursor-calls:
+    description: "Maximum Cursor CLI calls allowed for one action run. Current engine defaults to one call."
+    required: false
+    default: "1"
+  timeout-seconds:
+    description: "Per Cursor CLI call timeout in seconds."
+    required: false
+    default: "600"
   filter-mode:
     description: "Diff filter mode: added, diff_context, file."
     required: false
@@ -198,6 +214,10 @@ runs:
         INPUT_REVIEW_FOCUS: ${{ inputs.review-focus }}
         INPUT_MAX_FINDINGS: ${{ inputs.max-findings }}
         INPUT_MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
+        INPUT_MAX_FILES: ${{ inputs.max-files }}
+        INPUT_MAX_HUNKS: ${{ inputs.max-hunks }}
+        INPUT_MAX_CURSOR_CALLS: ${{ inputs.max-cursor-calls }}
+        INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         INPUT_FILTER_MODE: ${{ inputs.filter-mode }}
         INPUT_INCLUDE_PATTERNS: ${{ inputs.include-patterns }}
         INPUT_EXCLUDE_PATTERNS: ${{ inputs.exclude-patterns }}

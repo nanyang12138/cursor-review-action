@@ -13,7 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import command_args, commands, config, context, parser, prompts, render, runner, trust_policy  # noqa: E402
+from engine import command_args, commands, config, context, diff_selector, parser, prompts, render, runner, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -109,6 +109,10 @@ exclude_patterns: ["dist/**", "*.lock"]
             "INPUT_COMMENT_AUTHOR_ASSOCIATION": "MEMBER",
             "INPUT_TRUSTED_AUTHOR_ASSOCIATIONS": "OWNER,MEMBER",
             "INPUT_COMMIT_MESSAGES": "Add parser\nAdd tests",
+            "INPUT_MAX_FILES": "7",
+            "INPUT_MAX_HUNKS": "9",
+            "INPUT_MAX_CURSOR_CALLS": "1",
+            "INPUT_TIMEOUT_SECONDS": "30",
             "CURSOR_API_KEY": "test-key",
         }
 
@@ -124,6 +128,10 @@ exclude_patterns: ["dist/**", "*.lock"]
         self.assertEqual(settings["trusted_author_associations"], "OWNER,MEMBER")
         self.assertTrue(settings["cursor_api_key_present"])
         self.assertEqual(settings["commit_messages"], "Add parser\nAdd tests")
+        self.assertEqual(settings["max_files"], 7)
+        self.assertEqual(settings["max_hunks"], 9)
+        self.assertEqual(settings["max_cursor_calls"], 1)
+        self.assertEqual(settings["timeout_seconds"], 30)
 
 
 class ContextBuilderTests(unittest.TestCase):
@@ -183,8 +191,9 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertTrue(truncated)
         self.assertIn("a.py", diff_text)
         self.assertNotIn("b.py b/b.py", diff_text)
-        self.assertEqual(meta["reviewed_files"], [{"path": "a.py", "bytes": 32, "status": "included"}])
+        self.assertEqual(meta["reviewed_files"], [{"path": "a.py", "bytes": 32, "hunks": 0, "status": "included"}])
         self.assertEqual(meta["skipped_files"], [{"path": "b.py", "reason": "max_diff_bytes"}])
+        self.assertEqual(meta["truncation_reasons"], ["max_diff_bytes"])
 
     def test_build_diff_records_filter_skipped_files_without_truncation(self) -> None:
         with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
@@ -198,6 +207,45 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertFalse(truncated)
         self.assertEqual([item["path"] for item in meta["reviewed_files"]], ["src/a.py"])
         self.assertEqual(meta["skipped_files"], [{"path": "dist/b.js", "reason": "excluded"}])
+
+    def test_build_diff_applies_max_files_budget(self) -> None:
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(diff_selector, "changed_files", return_value=["a.py", "b.py", "c.py"]):
+                with mock.patch.object(diff_selector, "_file_diff", return_value="diff --git a/a.py b/a.py\n+small\n"):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        _diff_text, _stat, truncated, meta = diff_selector.build_diff(
+                            {"max_diff_bytes": 120000, "max_files": 2}
+                        )
+
+        self.assertTrue(truncated)
+        self.assertEqual(meta["files"], ["a.py", "b.py"])
+        self.assertEqual(meta["skipped_files"], [{"path": "c.py", "reason": "max_files"}])
+        self.assertEqual(meta["truncation_reasons"], ["max_files"])
+
+    def test_build_diff_applies_max_hunks_budget(self) -> None:
+        diff = """diff --git a/a.py b/a.py
+@@ -1,3 +1,3 @@
++one
+@@ -10,3 +10,3 @@
++two
+@@ -20,3 +20,3 @@
++three
+"""
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(diff_selector, "changed_files", return_value=["a.py"]):
+                with mock.patch.object(diff_selector, "_file_diff", return_value=diff):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        diff_text, _stat, truncated, meta = diff_selector.build_diff(
+                            {"max_diff_bytes": 120000, "max_hunks": 2}
+                        )
+
+        self.assertTrue(truncated)
+        self.assertIn("+two", diff_text)
+        self.assertNotIn("+three", diff_text)
+        self.assertEqual(meta["hunks"], 2)
+        self.assertEqual(meta["reviewed_files"][0]["status"], "partial")
+        self.assertEqual(meta["skipped_files"], [{"path": "a.py", "reason": "max_hunks_partial"}])
+        self.assertEqual(meta["truncation_reasons"], ["max_hunks"])
 
 
 class PromptParserRenderTests(unittest.TestCase):
@@ -425,6 +473,8 @@ class RunnerContractTests(unittest.TestCase):
         self.assertEqual(result.command_name, "review")
         self.assertEqual(result.timeout_seconds, 600)
         self.assertEqual(result.diagnostics["requested_model"], "auto")
+        self.assertEqual(result.diagnostics["max_cursor_calls"], 1)
+        self.assertEqual(result.diagnostics["cursor_calls_attempted"], 1)
         run_command.assert_called_once()
         self.assertEqual(run_command.call_args.kwargs["timeout"], 600)
 
