@@ -931,6 +931,9 @@ PR-Agent behavior to learn from:
 Current action:
 
 - Uses GitHub Actions, Python stdlib, Cursor CLI installer, and `actions/github-script`.
+- `scripts/engine/supply_chain.py` verifies Python sources remain stdlib-only.
+- `docs/dependencies.md` records runtime dependency surfaces and update policy.
+- `docs/release-checklist.md` records human-reviewed release gates.
 
 Cursor-native implementation:
 
@@ -942,6 +945,7 @@ Cursor-native implementation:
 
 Implementation target:
 
+- `scripts/engine/supply_chain.py`
 - `docs/release-checklist.md`
 - `docs/dependencies.md`
 
@@ -954,6 +958,7 @@ Parity level:
 
 Validation checklist:
 
+- Unit tests scan `scripts/` for accidental third-party Python imports.
 - `v1` README uses `@v1`, not `@main`.
 - Examples use supported GitHub Action versions.
 - Release notes mention known dependency risks.

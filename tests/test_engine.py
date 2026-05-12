@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -1228,6 +1228,49 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("/cursor-ask", rendered)
         self.assertNotIn("/cursor-improve -", rendered)
         self.assertIn("Cursor contacted: `false`", rendered)
+
+
+class SupplyChainTests(unittest.TestCase):
+    def test_scripts_remain_stdlib_only(self) -> None:
+        diagnostics = supply_chain.scan_stdlib_imports([ROOT / "scripts"], repo_root=ROOT)
+
+        self.assertEqual(diagnostics["schema_version"], supply_chain.SCHEMA_VERSION)
+        self.assertTrue(diagnostics["stdlib_only"])
+        self.assertEqual(diagnostics["external_imports"], [])
+        self.assertIn("scripts/cursor_review.py", diagnostics["scanned_files"])
+
+    def test_stdlib_scan_reports_external_imports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "uses_external.py"
+            source.write_text("import requests\nfrom engine import config\n", encoding="utf-8")
+
+            diagnostics = supply_chain.scan_stdlib_imports([source])
+
+        self.assertFalse(diagnostics["stdlib_only"])
+        self.assertEqual(diagnostics["external_imports"][0]["module"], "requests")
+
+    def test_action_ref_policy_requires_tags_for_stable_examples(self) -> None:
+        main_policy = supply_chain.action_ref_policy("main")
+        tag_policy = supply_chain.action_ref_policy("v1")
+
+        self.assertEqual(main_policy["status"], "pre_stable_only")
+        self.assertFalse(main_policy["stable_release_allowed"])
+        self.assertEqual(tag_policy["status"], "stable_tag")
+        self.assertTrue(tag_policy["stable_release_allowed"])
+
+    def test_release_and_dependency_docs_cover_required_supply_chain_gates(self) -> None:
+        release_checklist = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
+        dependencies = (ROOT / "docs" / "dependencies.md").read_text(encoding="utf-8")
+
+        for doc in [release_checklist, dependencies]:
+            self.assertIn("SUPPLY-CHAIN-P0", doc)
+            self.assertIn("stdlib", doc.lower())
+            self.assertIn("Cursor CLI", doc)
+        self.assertIn("Never auto-create release tags", release_checklist)
+        self.assertIn("nanyang12138/cursor-review-action@main", release_checklist)
+        self.assertIn("nanyang12138/cursor-review-action@v1", release_checklist)
+        self.assertIn("actions/github-script@v7", dependencies)
+        self.assertIn("scripts/install-cursor.sh", dependencies)
 
 
 class TriggerTrustPolicyTests(unittest.TestCase):

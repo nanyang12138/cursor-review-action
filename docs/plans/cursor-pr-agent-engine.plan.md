@@ -118,7 +118,7 @@ todos:
     status: completed
   - id: supply-chain
     content: 建立依赖/发布 checklist，保持 engine stdlib-only，稳定 release 后示例切换到 tag
-    status: pending
+    status: completed
   - id: review-lifecycle
     content: 建立 queued/context/diff/cursor/parser/published/failed/partial 生命周期状态和 diagnostics
     status: pending
