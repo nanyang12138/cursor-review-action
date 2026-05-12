@@ -106,7 +106,7 @@ todos:
     status: completed
   - id: local-dry-run
     content: 提供不需要 CURSOR_API_KEY 的本地 dry-run，用于验证 config/context/diff/prompt/parser/render
-    status: pending
+    status: completed
   - id: localization
     content: 确保 language 只影响人类可读内容，不改变 JSON schema keys 和 diagnostics keys
     status: pending

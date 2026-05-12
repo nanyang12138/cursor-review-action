@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import sys
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
 from engine.help import render_help
+from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
 from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt, prompt_template_version
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
@@ -17,7 +19,23 @@ from engine.run_state import build_run_state
 from engine.trust_policy import evaluate_trigger_trust
 
 
-def main() -> int:
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run Cursor Review Action engine.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run config/context/diff/prompt/parser/render locally without contacting Cursor.",
+    )
+    parser.add_argument(
+        "--dry-run-output",
+        default="",
+        help="Optional stored Cursor-like output file to parse during --dry-run.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args([] if argv is None else argv)
     settings = load_settings()
     command, user_prompt = derive_command_and_prompt(settings)
     settings["resolved_command"] = command
@@ -55,6 +73,7 @@ def main() -> int:
         settings["command_arg_overrides"] = {}
         settings["command_arg_keys"] = []
         settings["command_arg_warnings"] = []
+    settings["resolved_user_prompt"] = user_prompt
 
     enabled, message = ensure_command_enabled(command, settings)
     if not enabled:
@@ -68,6 +87,18 @@ def main() -> int:
         set_output("should_comment", "true")
         write_step_summary(rendered)
         return int(ci_policy["workflow_exit_code"])
+
+    if args.dry_run:
+        result = run_local_dry_run(settings, args.dry_run_output or None)
+        write_local_dry_run_artifacts(result)
+        set_output("summary", result.rendered)
+        set_output("findings_json", result.findings_json)
+        set_output("ci_policy_json", ci_policy_json(result.ci_policy))
+        set_output("exit_code", "0")
+        set_output("diff_truncated", str(result.diff_truncated).lower())
+        set_output("should_comment", "false")
+        write_step_summary(result.rendered)
+        return 0
 
     trigger_decision = evaluate_trigger_trust(settings)
     settings["trigger_trust"] = trigger_decision.diagnostics
@@ -172,4 +203,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

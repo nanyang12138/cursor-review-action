@@ -69,6 +69,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Prompt template version: `{settings.get('prompt_template_version', 'unknown')}`",
         f"- Model: `{settings.get('model')}`",
         f"- Runner: `{runner_diagnostics.get('runner', 'cursor_cli')}`",
+        f"- Cursor contacted: `{str(runner_diagnostics.get('cursor_contacted', True)).lower()}`",
         f"- Runner failure kind: `{runner_diagnostics.get('failure_kind', 'none')}`",
         f"- Runner timeout seconds: `{runner_diagnostics.get('timeout_seconds', settings.get('timeout_seconds', 600))}`",
         f"- Runner retry count: `{runner_diagnostics.get('retry_count', 0)}`",
@@ -103,6 +104,8 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
             diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
         if "repair_succeeded" in parser_diagnostics:
             diagnostics.append(f"- Parser repair succeeded: `{str(parser_diagnostics.get('repair_succeeded')).lower()}`")
+        if parser_diagnostics.get("dry_run_output_source"):
+            diagnostics.append(f"- Dry-run output source: `{parser_diagnostics.get('dry_run_output_source')}`")
     if budget:
         diagnostics.append(f"- Budget max diff bytes: `{budget.get('max_diff_bytes')}`")
         diagnostics.append(f"- Budget max files: `{budget.get('max_files')}`")
