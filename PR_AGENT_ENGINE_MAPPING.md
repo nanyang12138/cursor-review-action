@@ -1668,8 +1668,8 @@ Current action:
 
 - Defines the minimum fixture inventory and tracks concrete no-Cursor fixtures
   in `tests/fixtures/README.md` and `docs/parity-scorecard.md`.
-- As of the invalid config fixture, the suite has 11 concrete no-Cursor
-  fixtures: 9 PR regression fixtures, 1 output quality gate fixture, and 1
+- As of the empty Cursor output fixture, the suite has 12 concrete no-Cursor
+  fixtures: 10 PR regression fixtures, 1 output quality gate fixture, and 1
   config-invalid fixture.
 
 Cursor-native implementation:
@@ -1721,10 +1721,13 @@ Implementation evidence:
 - `tests/fixtures/pr_regression/invalid_model_output` covers malformed model
   `<findings_json>` and verifies parser fallback plus `publish_with_diagnostics`
   output quality gate behavior without contacting Cursor.
+- `tests/fixtures/pr_regression/empty_cursor_output` covers empty Cursor stdout
+  and verifies safe markdown fallback, runner `output` diagnostics, retry
+  exhaustion, and `publish_with_diagnostics` quality gate behavior.
 - `tests/fixtures/config_invalid/bad_values` covers unknown config keys plus
   invalid numeric, boolean, and filter-mode values, verifying safe fallback
   diagnostics before Cursor is contacted.
-- `tests/fixtures/README.md` records the 11 concrete no-Cursor fixtures and the
+- `tests/fixtures/README.md` records the 12 concrete no-Cursor fixtures and the
   remaining `v1` target of 20 fixtures.
 - `docs/parity-scorecard.md` tracks `FIXTURE-HARNESS-P0` evidence and keeps the
   remaining final-product fixture blockers visible.

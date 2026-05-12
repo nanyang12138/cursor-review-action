@@ -6,7 +6,7 @@ parsing, and rendered diagnostics.
 
 Each concrete fixture must declare capability IDs so product parity claims can be
 traced back to repeatable evidence in `docs/parity-scorecard.md`. The harness
-currently has 11 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
+currently has 12 concrete no-Cursor fixtures, satisfying the `v0.5` fixture
 volume gate while the `v1` target remains 20 fixtures. The review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
@@ -24,6 +24,9 @@ volume gate while the `v1` target remains 20 fixtures. The review harness covers
 - `invalid_model_output`: invalid model `<findings_json>` fixture that preserves
   readable markdown while routing malformed structured output through parser
   fallback and quality-gate diagnostics.
+- `empty_cursor_output`: empty Cursor stdout fixture that emits a safe markdown
+  fallback, runner `output` diagnostics, retry-exhaustion diagnostics, and a
+  `publish_with_diagnostics` quality-gate decision.
 
 Output quality gate fixtures live under `tests/fixtures/quality_gate/*` and cover
 deterministic publish-decision behavior. The initial quality gate fixture is:
