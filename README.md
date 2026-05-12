@@ -35,6 +35,7 @@ This action is intentionally smaller:
 - Truncate very large diffs and explain that the review is partial.
 - Update the previous Cursor review comment instead of creating comment spam.
 - Output diagnostics for permissions, model, diff size, and Cursor CLI failures.
+- Run a local no-Cursor dry-run for config, diff, prompt, parser, and render checks.
 
 ## Requirements
 
@@ -388,6 +389,18 @@ Unknown arguments are not used as configuration overrides. They remain ordinary 
 Cursor Review Action comments are advisory and non-blocking by default. A human reviewer decides whether to accept, dismiss, or follow up on findings.
 
 The action does not approve PRs, merge PRs, or fail CI because of findings by default. See `docs/human-review-workflow.md` for the author checklist and maintainer override guidance, and `docs/ci-policy.md` for the `fail-on-error` / `fail-on-findings` status policy.
+
+## Local Dry-Run
+
+Contributors can validate the engine without GitHub Actions or `CURSOR_API_KEY`:
+
+```bash
+python3 scripts/cursor_review.py --dry-run
+```
+
+This writes `cursor_review_prompt.txt`, `cursor_review.md`, `findings.json`, and
+`cursor_review_diagnostics.json` locally. To parse a stored Cursor-like response,
+use `--dry-run-output stored-output.txt`. See `docs/local-development.md`.
 
 ## Security Model
 

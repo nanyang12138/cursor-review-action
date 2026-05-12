@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -1274,6 +1275,16 @@ class RunnerContractTests(unittest.TestCase):
 
 
 class EntrypointTests(unittest.TestCase):
+    def _git(self, cwd: Path, *args: str) -> None:
+        subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
     def test_main_orchestrates_engine_modules_without_cursor_api(self) -> None:
         fake_context = context.ReviewContext(
             diff_text="diff --git a/a.py b/a.py",
@@ -1340,6 +1351,62 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("Maximum findings: 2.", prompt)
             self.assertIn("Review focus: security, tests.", prompt)
             self.assertIn("Check auth.", prompt)
+
+    def test_main_local_dry_run_builds_prompt_and_render_without_cursor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._git(root, "init")
+            self._git(root, "config", "user.email", "test@example.com")
+            self._git(root, "config", "user.name", "Test User")
+            (root / ".cursor-review.yml").write_text("language: en\nmax_findings: 2\n", encoding="utf-8")
+            (root / "app.py").write_text("def value():\n    return 1\n", encoding="utf-8")
+            self._git(root, "add", ".")
+            self._git(root, "commit", "-m", "base")
+            (root / "app.py").write_text("def value():\n    return 2\n", encoding="utf-8")
+            self._git(root, "add", "app.py")
+            self._git(root, "commit", "-m", "head")
+            stored_output = root / "stored-output.txt"
+            stored_output.write_text(
+                """
+<review_markdown>Stored dry-run result.</review_markdown>
+<findings_json>[]</findings_json>
+""".strip(),
+                encoding="utf-8",
+            )
+            env = {
+                "INPUT_COMMAND": "review",
+                "INPUT_ENABLED_COMMANDS": "review",
+                "INPUT_CONFIG_PATH": ".cursor-review.yml",
+                "INPUT_EVENT_NAME": "pull_request",
+                "INPUT_PR_IS_FORK": "false",
+                "GITHUB_OUTPUT": str(root / "outputs.txt"),
+                "GITHUB_STEP_SUMMARY": str(root / "summary.md"),
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch.object(cursor_review, "run_cursor_result") as run_cursor:
+                    cwd = os.getcwd()
+                    os.chdir(root)
+                    try:
+                        exit_code = cursor_review.main(["--dry-run", "--dry-run-output", str(stored_output)])
+                    finally:
+                        os.chdir(cwd)
+
+            self.assertEqual(exit_code, 0)
+            run_cursor.assert_not_called()
+            prompt = (root / "cursor_review_prompt.txt").read_text(encoding="utf-8")
+            rendered = (root / "cursor_review.md").read_text(encoding="utf-8")
+            diagnostics = json.loads((root / "cursor_review_diagnostics.json").read_text(encoding="utf-8"))
+            outputs = (root / "outputs.txt").read_text(encoding="utf-8")
+            self.assertIn("+    return 2", prompt)
+            self.assertIn("Stored dry-run result.", rendered)
+            self.assertIn("Runner: `local_dry_run`", rendered)
+            self.assertIn("Cursor contacted: `false`", rendered)
+            self.assertIn("Dry-run output source: `stored_file`", rendered)
+            self.assertEqual(json.loads((root / "findings.json").read_text(encoding="utf-8")), [])
+            self.assertEqual(diagnostics["mode"], "local_dry_run")
+            self.assertFalse(diagnostics["cursor_contacted"])
+            self.assertIn("should_comment<<", outputs)
+            self.assertIn("false", outputs)
 
     def test_main_skips_untrusted_issue_comment_before_cursor(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
