@@ -1,84 +1,92 @@
+import copy
+import json
 from typing import Any, Dict
 
 
-SCHEMA_VERSION = "cursor-review-action/v0.4"
+COMMON_RESPONSE_WRAPPER: Dict[str, Any] = {
+    "review_markdown": "string with the human-readable response",
+    "findings_json": "JSON array matching the command schema below",
+}
 
 
-def _base_item(kind: str) -> Dict[str, Any]:
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "kind": kind,
-    }
-
-
-COMMAND_OUTPUT_SCHEMAS: Dict[str, Dict[str, Any]] = {
+COMMAND_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "review": {
-        "tag": "findings_json",
-        "shape": "JSON array of review finding objects. Use [] when there are no actionable findings.",
-        "item": {
-            **_base_item("review_finding"),
-            "severity": "critical|high|medium|low",
-            "category": "bug|security|performance|tests|regression|edge_case",
-            "file": "repository-relative path, or empty string when not file-specific",
-            "line": "new-file line number when anchored, otherwise null",
-            "line_side": "new|old|file|unknown",
-            "title": "short actionable finding title",
-            "body": "why this matters, grounded in selected diff or PR context",
-            "confidence": "high|medium|low",
-            "evidence": "brief selected-diff or PR-context evidence",
-            "suggestion": "concrete fix guidance, or empty string",
-            "grounding": "anchored|file_only|unanchored|invalid",
+        "schema_name": "cursor_review_findings",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["severity", "file", "line", "title", "body", "confidence", "suggestion", "evidence"],
+            "properties": {
+                "severity": "critical | high | medium | low",
+                "file": "changed file path",
+                "line": "changed line number, or null when only file-level evidence is available",
+                "title": "short actionable finding title",
+                "body": "why this is a correctness, security, performance, test, or regression risk",
+                "confidence": "high | medium | low",
+                "suggestion": "concrete fix direction",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
     "ask": {
-        "tag": "findings_json",
-        "shape": "JSON array with one answer object. Use [] only when the question cannot be answered from context.",
-        "item": {
-            **_base_item("answer"),
-            "question": "user question being answered",
-            "answer": "direct answer using only selected PR context",
-            "evidence_refs": [
-                {
-                    "file": "repository-relative path, or empty string",
-                    "line": "line number when available, otherwise null",
-                    "quote": "short supporting excerpt from selected context",
-                }
-            ],
-            "confidence": "high|medium|low",
-            "follow_up_needed": "boolean",
+        "schema_name": "cursor_ask_evidence",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["file", "line", "question_relevance", "evidence"],
+            "properties": {
+                "file": "changed file path, or null for PR-level evidence",
+                "line": "changed line number, or null for PR-level evidence",
+                "question_relevance": "why this evidence answers the user question",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
     "improve": {
-        "tag": "findings_json",
-        "shape": "JSON array of improvement suggestion objects. Use [] when no safe suggestions are available.",
-        "item": {
-            **_base_item("improvement_suggestion"),
-            "priority": "high|medium|low",
-            "category": "tests|maintainability|readability|performance|docs|refactor",
-            "file": "repository-relative path, or empty string when repo-wide",
-            "line": "line number when relevant, otherwise null",
-            "title": "short suggestion title",
-            "rationale": "why the suggestion improves the PR",
-            "before": "current behavior or code shape, or empty string",
-            "after": "suggested behavior or code shape, or empty string",
-            "confidence": "high|medium|low",
+        "schema_name": "cursor_improve_suggestions",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["priority", "file", "line", "title", "body", "confidence", "suggestion", "evidence"],
+            "properties": {
+                "priority": "high | medium | low",
+                "file": "changed file path, or null for PR-level suggestion",
+                "line": "changed line number, or null for PR-level suggestion",
+                "title": "short improvement title",
+                "body": "why the improvement is useful and not a duplicate review finding",
+                "confidence": "high | medium | low",
+                "suggestion": "concrete before/after guidance when safe",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
     "describe": {
-        "tag": "findings_json",
-        "shape": "JSON array with one PR description object. Do not request or imply PR body updates.",
-        "item": {
-            **_base_item("pr_description"),
-            "summary": "concise PR summary",
-            "walkthrough": ["bullet describing an important changed area"],
-            "risk_level": "high|medium|low",
-            "risks": ["notable review or release risk"],
-            "test_plan": ["test or validation item from context, or suggested verification"],
-            "changelog": "optional changelog-style sentence, or empty string",
+        "schema_name": "cursor_describe_sections",
+        "schema_version": "1.0",
+        "type": "array",
+        "items": {
+            "type": "object",
+            "required": ["section", "content", "evidence"],
+            "properties": {
+                "section": "summary | walkthrough | risk | tests | changelog",
+                "content": "concise section content suitable for a PR comment",
+                "evidence": "short quote or summary from the selected diff/context",
+            },
         },
     },
 }
 
 
-def output_schema_for_command(command: str) -> Dict[str, Any]:
-    return COMMAND_OUTPUT_SCHEMAS.get(command, COMMAND_OUTPUT_SCHEMAS["review"])
+def schema_for_command(command: str) -> Dict[str, Any]:
+    return copy.deepcopy(COMMAND_SCHEMAS.get(command, COMMAND_SCHEMAS["review"]))
+
+
+def schema_contract_for_prompt(command: str) -> str:
+    contract = {
+        "response_wrapper": COMMON_RESPONSE_WRAPPER,
+        "command_schema": schema_for_command(command),
+    }
+    return json.dumps(contract, ensure_ascii=False, indent=2)

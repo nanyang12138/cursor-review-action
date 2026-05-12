@@ -1,5 +1,24 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+
+def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
+    run_state = settings.get("run_state") or {}
+    if not run_state:
+        return []
+    diagnostics = [
+        f"- Run state schema: `{run_state.get('schema_version', 'unknown')}`",
+        f"- Run generated at: `{run_state.get('generated_at', 'unknown')}`",
+        f"- Run event name: `{run_state.get('event_name', 'unknown')}`",
+        f"- Run command source: `{run_state.get('command_source', 'unknown')}`",
+        f"- Run id: `{run_state.get('run_id', '') or 'unknown'}`",
+        f"- Run attempt: `{run_state.get('run_attempt', '') or 'unknown'}`",
+        f"- Base SHA: `{run_state.get('base_sha', '') or 'unknown'}`",
+        f"- Head SHA: `{run_state.get('head_sha', '') or 'unknown'}`",
+        f"- Stale run status: `{run_state.get('stale_status', 'unknown')}`",
+        f"- Idempotency key: `{run_state.get('idempotency_key', 'unknown')}`",
+    ]
+    return diagnostics
 
 
 def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str, Any]) -> str:
@@ -14,6 +33,7 @@ def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str,
         f"- PR is fork: `{str(trigger_diagnostics.get('pr_is_fork', False)).lower()}`",
         f"- Cursor API key present: `{str(trigger_diagnostics.get('cursor_api_key_present', False)).lower()}`",
     ]
+    diagnostics.extend(_run_state_diagnostics(settings))
     return f"""Cursor review skipped before contacting Cursor.
 
 Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
@@ -29,6 +49,10 @@ Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
 
 def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: str, truncated: bool, parsed_ok: bool, meta: Dict[str, Any], settings: Dict[str, Any], runner_diagnostics: Optional[Dict[str, Any]] = None) -> str:
     runner_diagnostics = runner_diagnostics or {}
+    budget = meta.get("budget") or {}
+    reviewed_files = meta.get("reviewed_files")
+    skipped_files = meta.get("skipped_files") or []
+    reviewed_count = len(reviewed_files) if reviewed_files is not None else len(meta.get("files", []))
     diagnostics = [
         f"- Command: `{settings.get('resolved_command')}`",
         f"- Model: `{settings.get('model')}`",
@@ -36,11 +60,29 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Runner failure kind: `{runner_diagnostics.get('failure_kind', 'none')}`",
         f"- Runner timeout seconds: `{runner_diagnostics.get('timeout_seconds', settings.get('timeout_seconds', 600))}`",
         f"- Runner retry count: `{runner_diagnostics.get('retry_count', 0)}`",
+        f"- Cursor calls attempted: `{runner_diagnostics.get('cursor_calls_attempted', 1)}`",
+        f"- Max Cursor calls: `{runner_diagnostics.get('max_cursor_calls', budget.get('max_cursor_calls', settings.get('max_cursor_calls', 1)))}`",
         f"- Filter mode: `{settings.get('filter_mode')}`",
         f"- Diff truncated: `{str(truncated).lower()}`",
         f"- Findings JSON parsed: `{str(parsed_ok).lower()}`",
         f"- Cursor exit code: `{exit_code}`",
     ]
+    diagnostics.extend(_run_state_diagnostics(settings))
+    parser_diagnostics = runner_diagnostics.get("parser") or {}
+    if parser_diagnostics:
+        diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")
+        diagnostics.append(f"- Parser fallback: `{parser_diagnostics.get('fallback', 'unknown')}`")
+        diagnostics.append(f"- Parser repair retry count: `{parser_diagnostics.get('repair_retry_count', 0)}`")
+        if parser_diagnostics.get("repair_skipped_reason"):
+            diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
+        if "repair_succeeded" in parser_diagnostics:
+            diagnostics.append(f"- Parser repair succeeded: `{str(parser_diagnostics.get('repair_succeeded')).lower()}`")
+    if budget:
+        diagnostics.append(f"- Budget max diff bytes: `{budget.get('max_diff_bytes')}`")
+        diagnostics.append(f"- Budget max files: `{budget.get('max_files')}`")
+        diagnostics.append(f"- Budget max hunks: `{budget.get('max_hunks')}`")
+        diagnostics.append(f"- Diff bytes reviewed: `{meta.get('diff_bytes', 0)}`")
+        diagnostics.append(f"- Diff hunks reviewed: `{meta.get('hunks', 0)}`")
     if settings.get("command_arg_keys"):
         diagnostics.append(f"- Command args applied: `{', '.join(settings.get('command_arg_keys', []))}`")
     for warning in settings.get("command_arg_warnings", []):
@@ -51,12 +93,8 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- Trigger reason: `{trigger_trust.get('reason', 'unknown')}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
-    reviewed_files = meta.get("reviewed_files")
-    reviewed_count = len(reviewed_files) if isinstance(reviewed_files, list) else len(meta.get("files", []))
-    skipped_files = meta.get("skipped_files")
-    skipped_count = len(skipped_files) if isinstance(skipped_files, list) else 0
     diagnostics.append(f"- Files reviewed: `{reviewed_count}`")
-    diagnostics.append(f"- Files skipped: `{skipped_count}`")
+    diagnostics.append(f"- Files skipped: `{len(skipped_files)}`")
     pull_request_context = meta.get("pull_request_context") or {}
     if pull_request_context:
         commit_count = len(pull_request_context.get("commit_messages") or [])
@@ -74,7 +112,8 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
 
     warning = ""
     if truncated:
-        warning = "\n> Note: The diff was truncated by `max_diff_bytes`, so this review may not cover every changed line.\n"
+        reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
+        warning = f"\n> Note: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
 
     return f"""{markdown.strip()}
 {warning}

@@ -1,0 +1,90 @@
+{
+  "name": "large_partial_review",
+  "capability_ids": [
+    "DIFF-LARGE-P0",
+    "BUDGET-CONTROLS-P1",
+    "PUB-PERSISTENT-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "max_diff_bytes": 500,
+    "max_files": 1,
+    "max_hunks": 1
+  },
+  "context": {
+    "diff_text": "diff --git a/src/a.py b/src/a.py\n@@ -1,3 +1,4 @@\n+print(\"reviewed\")\n[Diff truncated by cursor-review-action due to max_hunks]\n",
+    "stat": " src/a.py | 1 +\n src/b.py | 50 +++++++++++++++++++++++++",
+    "truncated": true,
+    "meta": {
+      "files": [
+        "src/a.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/a.py",
+          "bytes": 132,
+          "hunks": 1,
+          "status": "partial"
+        }
+      ],
+      "skipped_files": [
+        {
+          "path": "src/a.py",
+          "reason": "max_hunks_partial"
+        },
+        {
+          "path": "src/b.py",
+          "reason": "max_files"
+        }
+      ],
+      "budget": {
+        "max_diff_bytes": 500,
+        "max_files": 1,
+        "max_hunks": 1,
+        "max_cursor_calls": 1
+      },
+      "truncation_reasons": [
+        "max_files",
+        "max_hunks"
+      ],
+      "pull_request_context": {
+        "pr_number": "103",
+        "title": "Large generated update",
+        "body": "Touches generated and source files.",
+        "base_ref": "main",
+        "head_ref": "feature/large-update",
+        "commit_messages": [
+          "Update generated assets"
+        ],
+        "changed_files": [
+          "src/a.py",
+          "src/b.py"
+        ],
+        "diff_stat": "src/a.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Partial review completed for the selected diff.</review_markdown>\n<findings_json>[]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 0,
+    "prompt_contains": [
+      "\"diff_truncated\": true",
+      "\"truncation_reasons\": [",
+      "max_hunks"
+    ],
+    "markdown_contains": [
+      "Partial review completed"
+    ],
+    "rendered_contains": [
+      "selected diff was limited by `max_files, max_hunks`",
+      "Files reviewed: `1`",
+      "Files skipped: `2`",
+      "Budget max files: `1`"
+    ]
+  }
+}

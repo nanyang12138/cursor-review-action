@@ -106,6 +106,22 @@ inputs:
     description: "Maximum diff bytes sent to Cursor."
     required: false
     default: "120000"
+  max-files:
+    description: "Maximum changed files to include in the selected diff. Use 0 for unlimited."
+    required: false
+    default: "0"
+  max-hunks:
+    description: "Maximum diff hunks to include in the selected diff. Use 0 for unlimited."
+    required: false
+    default: "0"
+  max-cursor-calls:
+    description: "Maximum Cursor CLI calls allowed for one action run. Current engine defaults to one call."
+    required: false
+    default: "1"
+  timeout-seconds:
+    description: "Per Cursor CLI call timeout in seconds."
+    required: false
+    default: "600"
   filter-mode:
     description: "Diff filter mode: added, diff_context, file."
     required: false
@@ -198,6 +214,10 @@ runs:
         INPUT_REVIEW_FOCUS: ${{ inputs.review-focus }}
         INPUT_MAX_FINDINGS: ${{ inputs.max-findings }}
         INPUT_MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
+        INPUT_MAX_FILES: ${{ inputs.max-files }}
+        INPUT_MAX_HUNKS: ${{ inputs.max-hunks }}
+        INPUT_MAX_CURSOR_CALLS: ${{ inputs.max-cursor-calls }}
+        INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         INPUT_FILTER_MODE: ${{ inputs.filter-mode }}
         INPUT_INCLUDE_PATTERNS: ${{ inputs.include-patterns }}
         INPUT_EXCLUDE_PATTERNS: ${{ inputs.exclude-patterns }}
@@ -213,6 +233,9 @@ runs:
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         REVIEW_BODY: ${{ steps.review.outputs.summary }}
         RESOLVED_COMMAND: ${{ steps.review.outputs.resolved_command }}
+        COMMENT_MARKER: ${{ steps.review.outputs.comment_marker }}
+        COMMENT_TITLE: ${{ steps.review.outputs.comment_title }}
+        RUN_METADATA_COMMENT: ${{ steps.review.outputs.run_metadata_comment }}
         PR_NUMBER: ${{ inputs.pr-number }}
         PERSISTENT_COMMENT: ${{ inputs.persistent-comment }}
         COMMENT_MODE: ${{ inputs.comment-mode }}
@@ -221,7 +244,7 @@ runs:
         script: |
           const rawCommand = process.env.RESOLVED_COMMAND || 'review';
           const command = rawCommand.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'review';
-          const marker = `<!-- cursor-review-action:${command} -->`;
+          const marker = process.env.COMMENT_MARKER || `<!-- cursor-review-action:${command} -->`;
           const titles = {
             review: 'Cursor Review',
             ask: 'Cursor Ask',
@@ -230,7 +253,10 @@ runs:
           };
           const prNumber = Number(process.env.PR_NUMBER);
           const reviewBody = process.env.REVIEW_BODY || 'Cursor review produced no output.';
-          const body = `${marker}\n## ${titles[command] || `Cursor ${command}`}\n\n${reviewBody}`;
+          const title = process.env.COMMENT_TITLE || titles[command] || `Cursor ${command}`;
+          const metadataComment = process.env.RUN_METADATA_COMMENT || '';
+          const metadataBlock = metadataComment ? `${metadataComment}\n` : '';
+          const body = `${marker}\n${metadataBlock}## ${title}\n\n${reviewBody}`;
           const persistent = process.env.PERSISTENT_COMMENT === 'true' || process.env.COMMENT_MODE === 'update';
 
           let comment = null;

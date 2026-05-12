@@ -3,6 +3,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from .budget import normalized_budget_settings
+
 
 @dataclass
 class CursorRunResult:
@@ -47,16 +49,13 @@ def _classify_failure(exit_code: int, stdout: str, stderr: str, timed_out: bool 
 
 
 def _timeout_seconds(settings: Dict[str, Any]) -> int:
-    try:
-        timeout = int(str(settings.get("timeout_seconds", 600)).strip())
-    except Exception:
-        timeout = 600
-    return max(timeout, 1)
+    return normalized_budget_settings(settings)["timeout_seconds"]
 
 
 def run_cursor_result(prompt: str, settings: Dict[str, Any]) -> CursorRunResult:
     model = str(settings.get("model", "auto"))
     command_name = str(settings.get("resolved_command") or settings.get("command") or "review")
+    budgets = normalized_budget_settings(settings)
     timeout_seconds = _timeout_seconds(settings)
     command = ["agent", "-p", "--trust", "--model", model, "--output-format", "text", prompt]
     started = time.monotonic()
@@ -92,6 +91,8 @@ def run_cursor_result(prompt: str, settings: Dict[str, Any]) -> CursorRunResult:
         "duration_seconds": round(duration_seconds, 3),
         "retry_count": 0,
         "timeout_seconds": timeout_seconds,
+        "max_cursor_calls": budgets["max_cursor_calls"],
+        "cursor_calls_attempted": 1,
     }
     return CursorRunResult(
         raw_text=stdout,

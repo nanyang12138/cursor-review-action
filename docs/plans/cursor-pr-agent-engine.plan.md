@@ -64,22 +64,22 @@ todos:
     status: completed
   - id: budget-controls
     content: 增加 max_files、max_hunks、max_cursor_calls、timeout_seconds 等预算控制和诊断
-    status: pending
+    status: completed
   - id: parser-retry
     content: 实现结构化 JSON parser、一次 retry 和 markdown 降级路径
-    status: pending
+    status: completed
   - id: run-state
     content: 增加 command-specific markers、run metadata、stale-run diagnostics 和幂等更新策略
-    status: pending
+    status: completed
   - id: fixtures
     content: 建立 fixture PR regression harness，覆盖主要 review 场景
-    status: pending
+    status: completed
   - id: comparison-protocol
     content: 建立 PR-Agent comparison protocol，把样例 PR 差距转成 backlog 或 explicit non-goal
     status: pending
   - id: traceability-scorecard
     content: 建立 capability ID、parity scorecard、release notes 追踪机制，确保 P0 能力可追溯
-    status: pending
+    status: completed
   - id: prompt-governance
     content: 将 prompt templates 版本化，建立 prompt change checklist、质量指标和 fixture 更新规则
     status: pending
