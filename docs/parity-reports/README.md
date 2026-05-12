@@ -50,6 +50,9 @@ Use `template.md` for new reports. Each report must include:
 - Gap decision and owner document.
 - Fixture or regression coverage status.
 - Release impact.
+- Human acceptance rubric fields from `docs/acceptance-rubric.md`, including
+  false positives, missed issues, evidence quality, command intent, diagnostic
+  usefulness, skipped-content transparency, and follow-up action.
 
 ## Release gates
 
@@ -57,3 +60,5 @@ Use `template.md` for new reports. Each report must include:
 - Before `v1`: 10-20 comparison samples should cover common and high-risk PRs.
 - Every comparison gap must be converted to backlog, deferred rationale, or
   explicit non-goal before release readiness can be claimed.
+- Quality claims require matching fixture or dogfooding records using the human
+  acceptance rubric.

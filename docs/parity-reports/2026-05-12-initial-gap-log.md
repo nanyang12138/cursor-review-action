@@ -54,14 +54,18 @@ behavior is described only as a product-behavior class.
 ### GAP-2026-05-12-003
 
 - Sample: sample-large-partial
-- Gap: Partial coverage diagnostics exist, but there is no human acceptance
-  rubric for comparing false positives, missed issues, evidence quality, and
-  usefulness across comparison runs.
-- Evidence: `acceptance-rubric` remains pending in the plan.
+- Gap: Partial coverage diagnostics need human acceptance tracking for false
+  positives, missed issues, evidence quality, and usefulness across comparison
+  runs.
+- Evidence: `docs/acceptance-rubric.md` defines the rubric; fixture-level
+  `human_eval.md` records now cover the initial PR regression suite.
 - Decision: backlog
+- Resolution: Converted to capability evidence in `docs/acceptance-rubric.md`
+  and fixture `human_eval.md` records.
 - Capability/status target: `acceptance-rubric`, `ACCEPTANCE-RUBRIC-P1`
 - Follow-up document or issue: `docs/acceptance-rubric.md`
-- Release impact: Required for final product hardening and dogfooding evidence.
+- Release impact: Protocol gap closed for current fixtures; continued dogfooding
+  records are required before stable release readiness.
 
 ### GAP-2026-05-12-004
 

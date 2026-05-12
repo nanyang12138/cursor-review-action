@@ -1290,6 +1290,45 @@ class ComparisonProtocolTests(unittest.TestCase):
                 self.assertIn("Release impact:", section)
 
 
+class AcceptanceRubricTests(unittest.TestCase):
+    REQUIRED_FIELDS = [
+        "real_issue_found",
+        "false_positive_count",
+        "missed_issue_count",
+        "evidence_quality",
+        "command_intent_respected",
+        "output_conciseness",
+        "diagnostics_usefulness",
+        "skipped_content_transparency",
+        "follow_up_action",
+    ]
+
+    def test_acceptance_rubric_documents_required_fields_and_clean_room_boundary(self) -> None:
+        rubric = (ROOT / "docs" / "acceptance-rubric.md").read_text(encoding="utf-8")
+
+        self.assertIn("ACCEPTANCE-RUBRIC-P1", rubric)
+        self.assertIn("Do not copy PR-Agent source code", " ".join(rubric.split()))
+        for field in self.REQUIRED_FIELDS:
+            with self.subTest(field=field):
+                self.assertIn(f"`{field}`", rubric)
+
+    def test_every_pr_regression_fixture_has_human_acceptance_record(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                human_eval_path = fixture_path.parent / "human_eval.md"
+                self.assertTrue(human_eval_path.exists())
+                human_eval = human_eval_path.read_text(encoding="utf-8")
+
+                self.assertIn("# Human Evaluation", human_eval)
+                self.assertIn("ACCEPTANCE-RUBRIC-P1", human_eval)
+                for capability_id in fixture["capability_ids"]:
+                    self.assertIn(capability_id, human_eval)
+                for field in self.REQUIRED_FIELDS:
+                    self.assertRegex(human_eval, rf"(?m)^- {field}: .+", msg=f"missing {field}")
+
+
 class RunnerContractTests(unittest.TestCase):
     def test_run_cursor_result_records_success_contract(self) -> None:
         completed = mock.Mock(returncode=0, stdout="ok", stderr="")

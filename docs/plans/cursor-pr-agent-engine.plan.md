@@ -112,7 +112,7 @@ todos:
     status: completed
   - id: acceptance-rubric
     content: 建立 dogfooding/PR-Agent comparison 的人工验收 rubric，记录 false positive、missed issue、evidence quality
-    status: pending
+    status: completed
   - id: privacy-logging
     content: 定义发送给 Cursor、写入 Actions logs、写入 PR comments 的数据边界和 secret redaction 策略
     status: pending
