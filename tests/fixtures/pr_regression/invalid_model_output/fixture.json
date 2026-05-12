@@ -1,0 +1,76 @@
+{
+  "name": "invalid_model_output",
+  "capability_ids": [
+    "PARSER-FALLBACK-P0",
+    "PARSER-RETRY-P1",
+    "OUTPUT-QUALITY-GATE-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "parser stability",
+    "max_findings": 5,
+    "max_cursor_calls": 1
+  },
+  "context": {
+    "diff_text": "diff --git a/src/parser.py b/src/parser.py\n@@ -20,3 +20,4 @@ def parse(raw):\n     payload = json.loads(raw)\n+    return payload[\"items\"]\n",
+    "stat": " src/parser.py | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/parser.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/parser.py",
+          "bytes": 139,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "109",
+        "title": "Add parser item extraction",
+        "body": "Returns parsed items from model output.",
+        "base_ref": "main",
+        "head_ref": "feature/parser-items",
+        "commit_messages": [
+          "Return parsed items"
+        ],
+        "changed_files": [
+          "src/parser.py"
+        ],
+        "diff_stat": "src/parser.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Model output was readable but its findings JSON was malformed.</review_markdown>\n<findings_json>[{\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"src/parser.py\",\"line\":21,\"title\":\"Validate items before returning\",\"body\":\"The parser assumes items is present.\",\"suggestion\":\"Check for items before indexing.\",\"evidence\":\"return payload[\\\"items\\\"]\"}</findings_json>",
+  "expected": {
+    "parsed_ok": false,
+    "findings_type": "array",
+    "findings_count": 0,
+    "prompt_contains": [
+      "Review focus: parser stability.",
+      "\"title\": \"Add parser item extraction\"",
+      "src/parser.py"
+    ],
+    "markdown_contains": [
+      "Model output was readable"
+    ],
+    "rendered_contains": [
+      "Model output was readable but its findings JSON was malformed.",
+      "Findings JSON parsed: `false`",
+      "Parser reason: `invalid_json`",
+      "Parser fallback: `markdown`",
+      "Quality gate decision: `publish_with_diagnostics`",
+      "Quality gate reason: `parser_or_schema_diagnostics`"
+    ],
+    "findings_json_contains": [
+      "[]"
+    ]
+  }
+}
