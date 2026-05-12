@@ -79,7 +79,7 @@ todos:
     status: pending
   - id: traceability-scorecard
     content: 建立 capability ID、parity scorecard、release notes 追踪机制，确保 P0 能力可追溯
-    status: pending
+    status: completed
   - id: prompt-governance
     content: 将 prompt templates 版本化，建立 prompt change checklist、质量指标和 fixture 更新规则
     status: pending

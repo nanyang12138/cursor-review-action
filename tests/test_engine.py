@@ -638,6 +638,16 @@ class FixtureRegressionTests(unittest.TestCase):
                 ]
                 self.assertEqual(capabilities, fixture["capability_ids"])
 
+    def test_fixture_capabilities_are_tracked_in_parity_scorecard(self) -> None:
+        scorecard = (ROOT / "docs" / "parity-scorecard.md").read_text(encoding="utf-8")
+        fixture_ids = set()
+        for fixture_path in (ROOT / "tests" / "fixtures").rglob("*.json"):
+            fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+            fixture_ids.update(fixture.get("capability_ids") or [])
+        for capability_id in sorted(fixture_ids):
+            with self.subTest(capability_id=capability_id):
+                self.assertIn(f"| {capability_id} |", scorecard)
+
 
 class RunnerContractTests(unittest.TestCase):
     def test_run_cursor_result_records_success_contract(self) -> None:

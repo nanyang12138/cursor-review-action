@@ -5,7 +5,8 @@ They exercise the no-Cursor engine path for prompt construction, structured outp
 parsing, and rendered diagnostics.
 
 Each concrete fixture must declare capability IDs so product parity claims can be
-traced back to repeatable evidence. The initial review harness covers:
+traced back to repeatable evidence in `docs/parity-scorecard.md`. The initial
+review harness covers:
 
 - `docs_only_no_findings`: docs-only PR with no findings.
 - `security_finding`: high-risk review finding with structured JSON.
