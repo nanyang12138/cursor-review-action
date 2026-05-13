@@ -201,6 +201,32 @@ runs:
       shell: bash
       run: bash "$GITHUB_ACTION_PATH/scripts/install-cursor.sh"
 
+    - name: Read Cursor metadata cache
+      id: metadata_cache
+      if: ${{ inputs.github-token != '' && inputs.pr-number != '' }}
+      uses: actions/github-script@v7
+      env:
+        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+        PR_NUMBER: ${{ inputs.pr-number }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const markerPattern = /<!--\s*cursor-review-action-metadata-cache:[\s\S]*?\s*-->/;
+          const prNumber = Number(process.env.PR_NUMBER);
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: prNumber,
+            per_page: 100
+          });
+          const describeMarker = '<!-- cursor-review-action:describe -->';
+          const comment = comments
+            .filter((item) => item.user && item.user.type === 'Bot')
+            .reverse()
+            .find((item) => item.body && item.body.includes(describeMarker) && markerPattern.test(item.body));
+          const match = comment && comment.body ? comment.body.match(markerPattern) : null;
+          core.setOutput('metadata_cache_comment', match ? match[0] : '');
+
     - name: Run Cursor review
       id: review
       shell: bash
@@ -238,6 +264,7 @@ runs:
         INPUT_EXCLUDE_PATTERNS: ${{ inputs.exclude-patterns }}
         INPUT_SCOPE_MODE: ${{ inputs.scope-mode }}
         INPUT_SCOPE_FILES: ${{ inputs.scope-files }}
+        INPUT_METADATA_CACHE_COMMENT: ${{ steps.metadata_cache.outputs.metadata_cache_comment }}
         INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
         INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
         INPUT_DEBUG_ARTIFACTS: ${{ inputs.debug-artifacts }}
@@ -254,6 +281,7 @@ runs:
         COMMENT_MARKER: ${{ steps.review.outputs.comment_marker }}
         COMMENT_TITLE: ${{ steps.review.outputs.comment_title }}
         RUN_METADATA_COMMENT: ${{ steps.review.outputs.run_metadata_comment }}
+        METADATA_CACHE_COMMENT: ${{ steps.review.outputs.metadata_cache_comment }}
         PR_NUMBER: ${{ inputs.pr-number }}
         PERSISTENT_COMMENT: ${{ inputs.persistent-comment }}
         COMMENT_MODE: ${{ inputs.comment-mode }}
@@ -274,8 +302,10 @@ runs:
           const reviewBody = process.env.REVIEW_BODY || 'Cursor review produced no output.';
           const title = process.env.COMMENT_TITLE || titles[command] || `Cursor ${command}`;
           const metadataComment = process.env.RUN_METADATA_COMMENT || '';
+          const metadataCacheComment = process.env.METADATA_CACHE_COMMENT || '';
           const metadataBlock = metadataComment ? `${metadataComment}\n` : '';
-          const body = `${marker}\n${metadataBlock}## ${title}\n\n${reviewBody}`;
+          const metadataCacheBlock = metadataCacheComment ? `${metadataCacheComment}\n` : '';
+          const body = `${marker}\n${metadataBlock}${metadataCacheBlock}## ${title}\n\n${reviewBody}`;
           const persistent = process.env.PERSISTENT_COMMENT === 'true' || process.env.COMMENT_MODE === 'update';
 
           let comment = null;

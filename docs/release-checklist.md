@@ -27,7 +27,11 @@ not authorize automation to merge, tag, publish, or release.
 | Cursor CLI | Installer and runner failure diagnostics are still covered by tests. |
 | Dogfooding | Human acceptance rubric records are reviewed for false positives, missed issues, evidence quality, and diagnostics usefulness. |
 | Documentation | README, troubleshooting, local dry-run, privacy/logging, CI policy, and non-goals are current. |
-| Release notes | Capability IDs, known limitations, dependency risks, and deferred non-goals are listed. |
+| Release notes | `docs/release-notes.md` lists capability IDs, known limitations, dependency risks, and deferred non-goals. |
+
+Use `docs/final-readiness-audit.md` as the automation-produced evidence index
+when reviewing these gates for the first stable release. It does not replace
+maintainer review and does not authorize automation to create tags or releases.
 
 ## Pre-stable references
 
@@ -63,3 +67,6 @@ uses: nanyang12138/cursor-review-action@v1
 - Dependency and supply-chain changes.
 - Security or privacy changes.
 - Upgrade notes for action inputs, outputs, config keys, and schema versions.
+
+Use `docs/release-notes.md` as the pre-stable draft. It remains advisory until a
+maintainer reviews the exact target commit and manually creates a release.

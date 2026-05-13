@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 
 from .diff_selector import build_diff
 from .guidance import load_repo_guidance
+from .metadata_cache import resolve_metadata_cache
 
 
 @dataclass
@@ -58,5 +59,9 @@ def build_review_context(settings: Dict[str, Any]) -> ReviewContext:
     meta = dict(meta)
     command = _clean_text(settings.get("resolved_command") or settings.get("command") or "review")
     meta["repo_guidance"] = load_repo_guidance(settings, command)
+    metadata_cache = resolve_metadata_cache(settings, command)
+    meta["metadata_cache"] = metadata_cache["diagnostics"]
+    if metadata_cache.get("content"):
+        meta["describe_metadata"] = metadata_cache["content"]
     meta["pull_request_context"] = build_pull_request_context(settings, stat, meta)
     return ReviewContext(diff_text=diff_text, stat=stat, truncated=truncated, meta=meta)

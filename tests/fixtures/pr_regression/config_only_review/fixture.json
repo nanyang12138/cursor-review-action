@@ -1,0 +1,85 @@
+{
+  "name": "config_only_review",
+  "capability_ids": [
+    "CONFIG-SCHEMA-P1",
+    "PROMPT-REVIEW-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "security,tests",
+    "max_findings": 3,
+    "config_loaded": ".cursor-review.yml",
+    "config_diagnostics": {
+      "schema_version": "config-diagnostics/v1",
+      "loaded": true,
+      "path": ".cursor-review.yml",
+      "unknown_key_count": 0,
+      "fallback_count": 0,
+      "warnings": []
+    }
+  },
+  "context": {
+    "diff_text": "diff --git a/.cursor-review.yml b/.cursor-review.yml\n@@ -1,4 +1,7 @@\n language: en\n review_focus: security,tests\n max_findings: 3\n+filter_mode: added\n+enabled_commands:\n+  - review\n",
+    "stat": " .cursor-review.yml | 3 +++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        ".cursor-review.yml"
+      ],
+      "reviewed_files": [
+        {
+          "path": ".cursor-review.yml",
+          "bytes": 181,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "115",
+        "title": "Tune Cursor review config",
+        "body": "Adjusts Cursor review defaults without touching application code.",
+        "base_ref": "main",
+        "head_ref": "config/cursor-review-defaults",
+        "commit_messages": [
+          "Tune cursor review config"
+        ],
+        "changed_files": [
+          ".cursor-review.yml"
+        ],
+        "diff_stat": ".cursor-review.yml | 3 +++"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>No actionable issues found in the configuration-only change.</review_markdown>\n<findings_json>[]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 0,
+    "prompt_contains": [
+      "Review focus: security, tests.",
+      "\"config_loaded\": \".cursor-review.yml\"",
+      ".cursor-review.yml | 3 +++",
+      "\"changed_files\": ["
+    ],
+    "markdown_contains": [
+      "configuration-only change"
+    ],
+    "rendered_contains": [
+      "No actionable issues found in the configuration-only change.",
+      "Files reviewed: `1`",
+      "Files skipped: `0`",
+      "Config schema: `config-diagnostics/v1`",
+      "Config loaded: `true`",
+      "Config: `.cursor-review.yml`",
+      "Quality gate decision: `publish`"
+    ],
+    "rendered_not_contains": [
+      "Adjusts Cursor review defaults without touching application code."
+    ]
+  }
+}

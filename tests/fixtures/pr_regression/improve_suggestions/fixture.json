@@ -1,0 +1,116 @@
+{
+  "name": "improve_suggestions",
+  "capability_ids": [
+    "CMD-IMPROVE-P1",
+    "PROMPT-COMMAND-SCHEMA-P0",
+    "PARSER-COMMAND-SCHEMA-P1",
+    "REPO-GUIDANCE-P1",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "improve",
+  "user_prompt": "Focus on making cache invalidation easier to reason about.",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "enabled_commands": "review,improve",
+    "max_findings": 3,
+    "review_focus": "maintainability,developer-experience",
+    "guidance_enabled": true
+  },
+  "context": {
+    "diff_text": "diff --git a/src/cache.py b/src/cache.py\n@@ -1,4 +1,7 @@\n def refresh_cache(cache, key, value):\n+    cache[key] = value\n+    cache[\"last_updated\"] = key\n+    return cache\n",
+    "stat": " src/cache.py | 3 +++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/cache.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/cache.py",
+          "bytes": 151,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "repo_guidance": {
+        "sections": [
+          {
+            "kind": "general",
+            "path": ".cursor-review-instructions.md",
+            "content": "Prefer suggestions that preserve the public API and include a testability note."
+          },
+          {
+            "kind": "improve",
+            "path": "best_practices.md",
+            "content": "Prefer small helpers when a function updates data and metadata together."
+          }
+        ],
+        "diagnostics": {
+          "enabled": true,
+          "schema_version": "repo-guidance/v1",
+          "bytes_used": 143,
+          "loaded": [
+            {
+              "kind": "general",
+              "path": ".cursor-review-instructions.md",
+              "bytes": 75,
+              "lines": 1
+            },
+            {
+              "kind": "improve",
+              "path": "best_practices.md",
+              "bytes": 68,
+              "lines": 1
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "pull_request_context": {
+        "pr_number": "112",
+        "title": "Track cache refresh metadata",
+        "body": "Adds a simple last-updated marker when cache entries are refreshed.",
+        "base_ref": "main",
+        "head_ref": "feature/cache-refresh-metadata",
+        "commit_messages": [
+          "Track cache refresh metadata"
+        ],
+        "changed_files": [
+          "src/cache.py"
+        ],
+        "diff_stat": "src/cache.py | 3 +++"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Suggested improvements:\n- Split the metadata update from the cache write so future invalidation rules stay easy to test.</review_markdown>\n<findings_json>{\"schema_version\":\"cursor-review-action/v1\",\"command\":\"improve\",\"suggestions\":[{\"schema_version\":\"cursor-review-finding/v1\",\"category\":\"maintainability\",\"priority\":\"medium\",\"confidence\":\"high\",\"file\":\"src/cache.py\",\"line\":3,\"title\":\"Separate cache data and metadata updates\",\"body\":\"The helper now mutates both the requested key and the last_updated marker in one branch, which makes future invalidation rules harder to test independently.\",\"suggestion\":\"Move the last_updated update into a small helper or add a focused test that documents the metadata invariant.\",\"evidence\":\"cache[key] = value and cache[\\\"last_updated\\\"] = key\"}]}</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "object",
+    "prompt_contains": [
+      "Suggest concrete improvements",
+      "Do not repeat bug/security/test findings",
+      "Focus on making cache invalidation easier to reason about.",
+      "### best_practices.md (improve)",
+      "Prefer small helpers when a function updates data and metadata together.",
+      "\"command\": \"improve\""
+    ],
+    "markdown_contains": [
+      "Split the metadata update from the cache write"
+    ],
+    "rendered_contains": [
+      "Suggested improvements:",
+      "Command: `improve`",
+      "Repo guidance loaded files: `.cursor-review-instructions.md, best_practices.md`",
+      "Quality gate decision: `publish`",
+      "Files reviewed: `1`"
+    ],
+    "findings_json_contains": [
+      "\"command\": \"improve\"",
+      "\"suggestions\"",
+      "\"category\": \"maintainability\"",
+      "\"title\": \"Separate cache data and metadata updates\""
+    ]
+  }
+}

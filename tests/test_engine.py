@@ -14,7 +14,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import cursor_review  # noqa: E402
-from engine import ci_policy, command_args, commands, config, context, diff_selector, fixtures, guidance, help as help_renderer, localization, parser, prompts, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
+from engine import ci_policy, command_args, commands, config, context, diff_index, diff_selector, findings, fixtures, grounding, guidance, help as help_renderer, lifecycle, localization, metadata_cache, parser, prompts, quality_gate, redaction, render, runner, run_state, schemas, scope, supply_chain, taxonomy, trust_policy  # noqa: E402
 
 
 class CommandTests(unittest.TestCase):
@@ -154,6 +154,86 @@ class RunStateTests(unittest.TestCase):
         self.assertEqual(json.loads(payload), metadata)
 
 
+class ReviewLifecycleTests(unittest.TestCase):
+    def test_lifecycle_finalizes_published_partial_and_failed_states(self) -> None:
+        base = lifecycle.start_lifecycle("review", {"run_id": "1001", "head_sha": "abc"})
+        base = lifecycle.advance_lifecycle(base, lifecycle.COLLECTING_CONTEXT, "building_review_context")
+        base = lifecycle.advance_lifecycle(base, lifecycle.SELECTING_DIFF, "selected_review_diff")
+        base = lifecycle.advance_lifecycle(base, lifecycle.CALLING_CURSOR, "calling_cursor_cli")
+        base = lifecycle.advance_lifecycle(base, lifecycle.PARSING_OUTPUT, "parsing_cursor_output")
+
+        published = lifecycle.finalize_lifecycle(
+            base,
+            exit_code=0,
+            parsed_ok=True,
+            diff_truncated=False,
+            quality_gate={"publish_decision": "publish"},
+            cursor_contacted=True,
+            should_comment=True,
+        )
+        partial = lifecycle.finalize_lifecycle(
+            base,
+            exit_code=0,
+            parsed_ok=True,
+            diff_truncated=True,
+            quality_gate={"publish_decision": "publish_partial"},
+            cursor_contacted=True,
+            should_comment=True,
+        )
+        failed = lifecycle.finalize_lifecycle(
+            base,
+            exit_code=1,
+            parsed_ok=False,
+            diff_truncated=False,
+            quality_gate={"publish_decision": "fail_before_publish"},
+            cursor_contacted=True,
+            should_comment=True,
+            failure_stage="calling_cursor",
+        )
+
+        self.assertEqual(published["final_state"], "published")
+        self.assertEqual(partial["final_state"], "partial")
+        self.assertEqual(partial["partial_reason"], "partial_review")
+        self.assertEqual(failed["final_state"], "failed")
+        self.assertEqual(failed["failed_stage"], "calling_cursor")
+        self.assertEqual(
+            published["state_sequence"],
+            ["queued", "collecting_context", "selecting_diff", "calling_cursor", "parsing_output", "published"],
+        )
+
+    def test_render_comment_includes_lifecycle_diagnostics(self) -> None:
+        run_lifecycle = lifecycle.finalize_lifecycle(
+            lifecycle.start_lifecycle("review"),
+            exit_code=0,
+            parsed_ok=True,
+            diff_truncated=False,
+            quality_gate={"publish_decision": "publish"},
+            cursor_contacted=True,
+            should_comment=True,
+        )
+
+        rendered = render.render_comment(
+            "No issues found.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["app.py"]},
+            {
+                "resolved_command": "review",
+                "model": "auto",
+                "filter_mode": "added",
+                "lifecycle": run_lifecycle,
+            },
+            {"runner": "cursor_cli", "cursor_contacted": True, "failure_kind": "none"},
+        )
+
+        self.assertIn("Lifecycle schema: `review-lifecycle/v1`", rendered)
+        self.assertIn("Lifecycle final state: `published`", rendered)
+        self.assertIn("Lifecycle stages: `queued -> published`", rendered)
+
+
 class ConfigTests(unittest.TestCase):
     def test_load_simple_yaml_supports_scalars_and_lists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -268,6 +348,129 @@ guidance_max_bytes: 1024
         self.assertTrue(settings["language_diagnostics"]["fallback_used"])
         self.assertEqual(settings["language_diagnostics"]["reason"], "multiline_language_defaulted")
 
+    def test_invalid_config_fixture_reports_safe_fallbacks(self) -> None:
+        fixture_path = ROOT / "tests" / "fixtures" / "config_invalid" / "bad_values" / "fixture.json"
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / ".cursor-review.yml"
+            config_path.write_text(fixture["config_text"], encoding="utf-8")
+            with mock.patch.dict(os.environ, {"INPUT_CONFIG_PATH": str(config_path)}, clear=True):
+                settings = config.load_settings()
+
+        expected = fixture["expected"]
+        diagnostics = settings["config_diagnostics"]
+
+        self.assertEqual(diagnostics["schema_version"], config.CONFIG_SCHEMA_VERSION)
+        self.assertEqual(diagnostics["loaded"], expected["loaded"])
+        self.assertEqual(
+            [item["key"] for item in diagnostics["unknown_keys"]],
+            expected["unknown_keys"],
+        )
+        self.assertEqual(
+            [item["key"] for item in diagnostics["invalid_values"]],
+            expected["invalid_keys"],
+        )
+        for key, value in expected["settings"].items():
+            self.assertEqual(settings[key], value)
+        for snippet in expected["warnings_contain"]:
+            self.assertTrue(
+                any(snippet in warning for warning in diagnostics["warnings"]),
+                msg=f"missing config warning containing {snippet!r}",
+            )
+
+
+class ConfigSchemaDocumentationTests(unittest.TestCase):
+    def _load_schema(self) -> dict:
+        return json.loads((ROOT / ".cursor-review.schema.json").read_text(encoding="utf-8"))
+
+    def test_repo_config_schema_is_valid_json_and_covers_stable_keys(self) -> None:
+        schema = self._load_schema()
+        properties = schema["properties"]
+
+        self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
+        self.assertFalse(schema["additionalProperties"])
+        for key in [
+            "model",
+            "language",
+            "review_focus",
+            "max_findings",
+            "max_diff_bytes",
+            "filter_mode",
+            "include_patterns",
+            "exclude_patterns",
+            "persistent_comment",
+            "enabled_commands",
+            "guidance_files",
+            "timeout_seconds",
+            "fail_on_error",
+            "fail_on_findings",
+        ]:
+            with self.subTest(key=key):
+                self.assertIn(key, properties)
+
+    def test_repo_config_schema_matches_runtime_defaults_and_constraints(self) -> None:
+        schema = self._load_schema()
+        properties = schema["properties"]
+
+        for key in [
+            "model",
+            "language",
+            "review_focus",
+            "max_findings",
+            "max_diff_bytes",
+            "max_files",
+            "max_hunks",
+            "max_cursor_calls",
+            "timeout_seconds",
+            "filter_mode",
+            "skip_generated_files",
+            "scope_mode",
+            "enabled_commands",
+            "trusted_author_associations",
+            "trigger_phrase",
+            "guidance_enabled",
+            "guidance_files",
+            "guidance_max_bytes",
+            "guidance_max_lines",
+            "metadata_cache_enabled",
+            "metadata_cache_max_bytes",
+            "debug_artifacts",
+            "fail_on_error",
+            "fail_on_findings",
+        ]:
+            with self.subTest(default=key):
+                if key == "guidance_files":
+                    continue
+                self.assertEqual(properties[key]["default"], config.DEFAULTS[key])
+
+        self.assertEqual(set(properties["filter_mode"]["enum"]), config.SUPPORTED_FILTER_MODES)
+        for key, (_default, minimum) in config.INT_SETTINGS.items():
+            with self.subTest(integer=key):
+                self.assertEqual(properties[key]["type"], "integer")
+                self.assertEqual(properties[key]["minimum"], minimum)
+        for key in config.BOOL_SETTINGS:
+            with self.subTest(boolean=key):
+                self.assertEqual(properties[key]["type"], "boolean")
+
+    def test_repo_config_schema_excludes_workflow_only_metadata_inputs(self) -> None:
+        properties = self._load_schema()["properties"]
+
+        for key in [
+            "base_sha",
+            "head_sha",
+            "pr_number",
+            "pr_title",
+            "pr_body",
+            "commit_messages",
+            "comment_body",
+            "cursor_api_key",
+            "github_token",
+            "metadata_cache_comment",
+        ]:
+            with self.subTest(key=key):
+                self.assertNotIn(key, properties)
+
 
 class CIPolicyTests(unittest.TestCase):
     def test_default_policy_does_not_fail_on_high_findings(self) -> None:
@@ -352,6 +555,149 @@ class ContextBuilderTests(unittest.TestCase):
         self.assertEqual(pr_context["changed_files"], ["scripts/engine/parser.py", "tests/test_engine.py"])
         self.assertEqual(pr_context["diff_stat"], "parser.py | 2 +")
         self.assertEqual(pr_context["comment_prompt"], "Focus on tests.")
+
+
+class MetadataCacheTests(unittest.TestCase):
+    def _describe_cache_comment(self, head_sha: str = "head-sha") -> str:
+        comment, diagnostics = metadata_cache.build_describe_metadata_cache_comment(
+            "describe",
+            json.dumps(
+                {
+                    "schema_version": schemas.OUTPUT_SCHEMA_VERSION,
+                    "command": "describe",
+                    "summary": "Adds parser metadata cache.",
+                    "walkthrough": ["Updates scripts/engine/metadata_cache.py"],
+                    "risks": ["Secret ghp_abcdefghijklmnopqrstuvwxyz123456 should be redacted."],
+                    "tests": ["python -m unittest"],
+                    "changelog": "No public API change.",
+                }
+            ),
+            {
+                "head_sha": head_sha,
+                "prompt_template_version": prompts.prompt_template_version(),
+                "metadata_cache_enabled": True,
+                "metadata_cache_max_bytes": 10000,
+                "run_state": {"generated_at": "2026-05-12T20:00:00Z", "head_sha": head_sha},
+            },
+            {"publish_decision": "publish"},
+        )
+        self.assertEqual(diagnostics["status"], "valid")
+        return comment
+
+    def test_describe_metadata_cache_comment_is_hidden_redacted_and_parseable(self) -> None:
+        comment = self._describe_cache_comment()
+
+        self.assertTrue(comment.startswith(metadata_cache.METADATA_CACHE_MARKER_PREFIX))
+        match = metadata_cache.METADATA_CACHE_MARKER_RE.search(comment)
+        self.assertIsNotNone(match)
+        payload = json.loads(match.group(1))
+        self.assertEqual(payload["schema_version"], metadata_cache.METADATA_CACHE_SCHEMA_VERSION)
+        self.assertEqual(payload["source_command"], "describe")
+        self.assertEqual(payload["head_sha"], "head-sha")
+        self.assertEqual(payload["output_schema_version"], schemas.OUTPUT_SCHEMA_VERSION)
+        self.assertIn("Adds parser metadata cache.", payload["content"]["summary"])
+        self.assertNotIn("ghp_abcdefghijklmnopqrstuvwxyz123456", comment)
+        self.assertIn("[REDACTED]", comment)
+
+    def test_resolve_metadata_cache_requires_enabled_matching_head_and_schema(self) -> None:
+        comment = self._describe_cache_comment("current-head")
+
+        valid = metadata_cache.resolve_metadata_cache(
+            {"resolved_command": "review", "head_sha": "current-head", "metadata_cache_comment": comment},
+            "review",
+        )
+        stale = metadata_cache.resolve_metadata_cache(
+            {"resolved_command": "review", "head_sha": "new-head", "metadata_cache_comment": comment},
+            "review",
+        )
+        disabled = metadata_cache.resolve_metadata_cache(
+            {
+                "resolved_command": "review",
+                "head_sha": "current-head",
+                "metadata_cache_comment": comment,
+                "metadata_cache_enabled": False,
+            },
+            "review",
+        )
+        describe_consumer = metadata_cache.resolve_metadata_cache(
+            {"resolved_command": "describe", "head_sha": "current-head", "metadata_cache_comment": comment},
+            "describe",
+        )
+
+        self.assertEqual(valid["diagnostics"]["status"], "valid")
+        self.assertEqual(valid["content"]["summary"], "Adds parser metadata cache.")
+        self.assertEqual(stale["diagnostics"]["status"], "stale")
+        self.assertEqual(stale["diagnostics"]["reason"], "head_sha_mismatch")
+        self.assertEqual(stale["content"], {})
+        self.assertEqual(disabled["diagnostics"]["status"], "disabled")
+        self.assertEqual(describe_consumer["diagnostics"]["status"], "not_applicable")
+
+    def test_context_and_prompt_reuse_valid_describe_metadata_without_raw_comment(self) -> None:
+        cache_comment = self._describe_cache_comment("head-sha")
+        settings = {
+            "resolved_command": "review",
+            "head_sha": "head-sha",
+            "metadata_cache_comment": cache_comment,
+            "metadata_cache_enabled": True,
+            "metadata_cache_max_bytes": 10000,
+            "language": "en",
+            "max_findings": 5,
+            "review_focus": "correctness",
+            "model": "auto",
+        }
+        diff_meta = {"head": "head-sha", "files": ["scripts/engine/metadata_cache.py"]}
+
+        with mock.patch.object(
+            context,
+            "build_diff",
+            return_value=("diff --git a/scripts/engine/metadata_cache.py b/scripts/engine/metadata_cache.py", " metadata_cache.py | 5 +", False, diff_meta),
+        ):
+            review_context = context.build_review_context(settings)
+
+        prompt = prompts.build_prompt(
+            "review",
+            "",
+            review_context.diff_text,
+            review_context.stat,
+            review_context.truncated,
+            review_context.meta,
+            settings,
+        )
+
+        self.assertEqual(review_context.meta["metadata_cache"]["status"], "valid")
+        self.assertEqual(review_context.meta["metadata_cache"]["reason"], "metadata_cache_reused")
+        self.assertEqual(review_context.meta["describe_metadata"]["summary"], "Adds parser metadata cache.")
+        self.assertIn("Cached describe metadata from this PR head SHA:", prompt)
+        self.assertIn("Adds parser metadata cache.", prompt)
+
+    def test_render_comment_reports_metadata_cache_diagnostics_without_content(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {
+                "files": ["a.py"],
+                "metadata_cache": {
+                    "schema_version": metadata_cache.METADATA_CACHE_SCHEMA_VERSION,
+                    "enabled": True,
+                    "status": "valid",
+                    "reason": "metadata_cache_reused",
+                    "source": "comment_marker",
+                    "head_sha_match": True,
+                    "bytes": 321,
+                },
+                "describe_metadata": {"summary": "Sensitive cached summary"},
+            },
+            {"resolved_command": "review", "model": "auto", "filter_mode": "added"},
+        )
+
+        self.assertIn("Metadata cache schema: `metadata-cache/v1`", rendered)
+        self.assertIn("Metadata cache status: `valid`", rendered)
+        self.assertIn("Metadata cache head match: `true`", rendered)
+        self.assertNotIn("Sensitive cached summary", rendered)
 
 
 class RepoGuidanceTests(unittest.TestCase):
@@ -540,6 +886,33 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertEqual([item["path"] for item in meta["reviewed_files"]], ["src/a.py"])
         self.assertEqual(meta["skipped_files"], [{"path": "dist/b.js", "reason": "excluded"}])
 
+    def test_build_diff_skips_generated_and_lockfiles_by_default(self) -> None:
+        def fake_file_diff(file_name: str, *_args: object) -> str:
+            return f"diff --git a/{file_name} b/{file_name}\n+small\n"
+
+        with mock.patch.object(diff_selector, "diff_range", return_value=("base", "head", "base...head")):
+            with mock.patch.object(
+                diff_selector,
+                "changed_files",
+                return_value=["src/app.py", "package-lock.json", "dist/app.min.js"],
+            ):
+                with mock.patch.object(diff_selector, "_file_diff", side_effect=fake_file_diff):
+                    with mock.patch.object(diff_selector, "run_command", return_value=mock.Mock(stdout="stat")):
+                        diff_text, _stat, truncated, meta = diff_selector.build_diff({"max_diff_bytes": 120000})
+
+        self.assertFalse(truncated)
+        self.assertIn("src/app.py", diff_text)
+        self.assertNotIn("package-lock.json", diff_text)
+        self.assertNotIn("dist/app.min.js", diff_text)
+        self.assertEqual(meta["files"], ["src/app.py"])
+        self.assertEqual(
+            meta["skipped_files"],
+            [
+                {"path": "package-lock.json", "reason": "generated_or_lockfile"},
+                {"path": "dist/app.min.js", "reason": "generated_or_lockfile"},
+            ],
+        )
+
     def test_build_diff_applies_command_file_scope_before_budget(self) -> None:
         def fake_file_diff(file_name: str, *_args: object) -> str:
             return f"diff --git a/{file_name} b/{file_name}\n+small\n"
@@ -603,6 +976,253 @@ class DiffSelectorTests(unittest.TestCase):
         self.assertEqual(meta["reviewed_files"][0]["status"], "partial")
         self.assertEqual(meta["skipped_files"], [{"path": "a.py", "reason": "max_hunks_partial"}])
         self.assertEqual(meta["truncation_reasons"], ["max_hunks"])
+
+
+class FindingGroundingTests(unittest.TestCase):
+    def test_diff_index_records_new_and_old_changed_lines(self) -> None:
+        diff_text = """diff --git a/app/auth.py b/app/auth.py
+--- a/app/auth.py
++++ b/app/auth.py
+@@ -10,3 +10,4 @@ def login(request):
+     user = authenticate(request)
+-    session["is_admin"] = False
++    session["is_admin"] = request.args.get("admin") == "1"
+     return redirect("/")
+"""
+
+        index = diff_index.build_diff_index(diff_text)
+        entry = index["files"]["app/auth.py"]
+
+        self.assertEqual(index["schema_version"], diff_index.DIFF_INDEX_SCHEMA_VERSION)
+        self.assertEqual(entry["new_changed_lines"], [11])
+        self.assertEqual(entry["old_changed_lines"], [11])
+        self.assertEqual(entry["hunks"][0]["header"], "@@ -10,3 +10,4 @@ def login(request):")
+
+    def test_grounding_classifies_anchored_file_only_invalid_and_unanchored_findings(self) -> None:
+        diff_text = """diff --git a/app/auth.py b/app/auth.py
+@@ -10,3 +10,4 @@ def login(request):
+     user = authenticate(request)
++    session["is_admin"] = request.args.get("admin") == "1"
+     return redirect("/")
+"""
+        index = diff_index.build_diff_index(diff_text, [{"path": "skipped.py", "reason": "max_files"}])
+        findings = [
+            {"file": "app/auth.py", "line": 11, "severity": "high", "confidence": "high", "title": "valid"},
+            {"file": "app/auth.py", "line": 10, "severity": "medium", "confidence": "high", "title": "context"},
+            {"file": "skipped.py", "line": 1, "severity": "critical", "confidence": "high", "title": "skipped"},
+            {"severity": "high", "confidence": "high", "title": "missing file"},
+        ]
+
+        result = grounding.ground_findings_json(json.dumps(findings), index, "review")
+        grounded = json.loads(result.findings_json)
+
+        self.assertEqual([item["grounding_status"] for item in grounded], ["anchored", "file_only", "invalid", "unanchored"])
+        self.assertEqual(grounded[0]["anchor"]["line"], 11)
+        self.assertEqual(grounded[1]["review_section"], "needs_human_verification")
+        self.assertTrue(grounded[2]["suppressed"])
+        self.assertEqual(grounded[2]["confidence"], "low")
+        self.assertEqual(result.diagnostics["anchored_count"], 1)
+        self.assertEqual(result.diagnostics["file_only_count"], 1)
+        self.assertEqual(result.diagnostics["invalid_anchor_count"], 1)
+        self.assertEqual(result.diagnostics["skipped_file_finding_count"], 1)
+
+    def test_grounding_supports_deleted_line_evidence_without_new_line_anchor(self) -> None:
+        diff_text = """diff --git a/src/flags.py b/src/flags.py
+@@ -20,3 +20,2 @@ FLAGS = {
+-    "unsafe": True,
+     "safe": True,
+}
+"""
+        index = diff_index.build_diff_index(diff_text)
+        findings = [
+            {
+                "file": "src/flags.py",
+                "line": None,
+                "old_line": 20,
+                "line_side": "old",
+                "severity": "medium",
+                "confidence": "high",
+                "title": "Deleted unsafe flag",
+            }
+        ]
+
+        result = grounding.ground_findings_json(json.dumps(findings), index, "review")
+        grounded = json.loads(result.findings_json)
+
+        self.assertEqual(grounded[0]["grounding_status"], "anchored")
+        self.assertEqual(grounded[0]["anchor"]["line_side"], "old")
+        self.assertEqual(grounded[0]["anchor"]["old_line"], 20)
+
+    def test_ci_policy_excludes_invalid_grounded_findings_from_gating_counts(self) -> None:
+        findings = [
+            {"severity": "critical", "grounding_status": "invalid", "suppressed": True},
+            {"severity": "high", "grounding_status": "file_only"},
+            {"severity": "high", "grounding_status": "anchored"},
+        ]
+
+        decision = ci_policy.evaluate_ci_policy(0, json.dumps(findings), {"fail_on_findings": True})
+
+        self.assertEqual(decision["finding_count"], 3)
+        self.assertEqual(decision["gating_eligible_finding_count"], 1)
+        self.assertEqual(decision["high_severity_finding_count"], 1)
+        self.assertEqual(decision["highest_severity"], "high")
+
+
+class FindingDedupTests(unittest.TestCase):
+    def test_deduplicates_same_file_line_before_applying_max_findings(self) -> None:
+        payload = [
+            {
+                "file": "src/app.py",
+                "line": 12,
+                "category": "bug",
+                "severity": "medium",
+                "confidence": "medium",
+                "grounding_status": "anchored",
+                "title": "Duplicate wording A",
+                "body": "Same actionable issue.",
+            },
+            {
+                "file": "src/app.py",
+                "line": 12,
+                "category": "bug",
+                "severity": "medium",
+                "confidence": "medium",
+                "grounding_status": "anchored",
+                "title": "Duplicate wording B",
+                "body": "Same actionable issue with different text.",
+            },
+            {
+                "file": "src/critical.py",
+                "line": 3,
+                "category": "security",
+                "severity": "critical",
+                "confidence": "high",
+                "grounding_status": "anchored",
+                "title": "Keep the critical issue",
+                "body": "This should sort ahead of medium findings.",
+            },
+        ]
+
+        result = findings.postprocess_findings_json(json.dumps(payload), {"max_findings": 2}, "review")
+        processed = json.loads(result.findings_json)
+
+        self.assertEqual(result.diagnostics["schema_version"], findings.FINDING_DEDUP_SCHEMA_VERSION)
+        self.assertEqual(result.diagnostics["input_count"], 3)
+        self.assertEqual(result.diagnostics["duplicate_count"], 1)
+        self.assertEqual(result.diagnostics["capped_count"], 0)
+        self.assertEqual(result.diagnostics["output_count"], 2)
+        self.assertEqual([item["file"] for item in processed], ["src/critical.py", "src/app.py"])
+        self.assertTrue(all(item.get("finding_fingerprint") for item in processed))
+
+    def test_low_confidence_unanchored_findings_do_not_displace_grounded_findings(self) -> None:
+        payload = [
+            {
+                "file": "",
+                "category": "security",
+                "severity": "critical",
+                "confidence": "low",
+                "grounding_status": "unanchored",
+                "suppressed": True,
+                "title": "Ungrounded broad claim",
+            },
+            {
+                "file": "src/app.py",
+                "line": 8,
+                "category": "bug",
+                "severity": "high",
+                "confidence": "high",
+                "grounding_status": "anchored",
+                "title": "Grounded bug",
+            },
+            {
+                "file": "src/other.py",
+                "line": 9,
+                "category": "test_gap",
+                "severity": "medium",
+                "confidence": "high",
+                "grounding_status": "anchored",
+                "title": "Grounded test gap",
+            },
+        ]
+
+        result = findings.postprocess_findings_json(json.dumps(payload), {"max_findings": 2}, "review")
+        processed = json.loads(result.findings_json)
+
+        self.assertEqual(result.diagnostics["capped_count"], 1)
+        self.assertEqual([item["title"] for item in processed], ["Grounded bug", "Grounded test gap"])
+
+
+class OutputQualityGateTests(unittest.TestCase):
+    def test_quality_gate_downgrades_unsupported_external_claims(self) -> None:
+        payload = [
+            {
+                "schema_version": schemas.FINDING_SCHEMA_VERSION,
+                "category": "test_gap",
+                "severity": "high",
+                "confidence": "high",
+                "file": "tests/test_app.py",
+                "line": 12,
+                "title": "Tests passed but assertion is missing",
+                "body": "All tests passed, but this new branch lacks an assertion.",
+                "suggestion": "Add an assertion that covers the new branch.",
+                "evidence": "+    if value: return True",
+                "grounding_status": "anchored",
+            }
+        ]
+
+        result = quality_gate.evaluate_output_quality(
+            "One finding.",
+            json.dumps(payload),
+            0,
+            True,
+            False,
+            {"files": ["tests/test_app.py"], "skipped_files": []},
+            {"resolved_command": "review"},
+            {"parser": {"schema": {"compatible": True}}},
+            redaction.redact_text(""),
+        )
+        gated = json.loads(result.findings_json)
+
+        self.assertEqual(result.diagnostics["schema_version"], quality_gate.QUALITY_GATE_SCHEMA_VERSION)
+        self.assertEqual(result.diagnostics["publish_decision"], quality_gate.SUPPRESS_FINDINGS)
+        self.assertEqual(result.diagnostics["unsupported_claim_count"], 1)
+        self.assertTrue(gated[0]["unsupported_claim"])
+        self.assertEqual(gated[0]["confidence"], "low")
+        self.assertTrue(gated[0]["suppressed"])
+        self.assertEqual(gated[0]["quality_gate_status"], "suppressed")
+
+    def test_quality_gate_marks_truncated_reviews_partial(self) -> None:
+        result = quality_gate.evaluate_output_quality(
+            "No findings.",
+            "[]",
+            0,
+            True,
+            True,
+            {"files": ["src/app.py"], "skipped_files": [{"path": "src/large.py", "reason": "max_files"}]},
+            {"resolved_command": "review"},
+            {"parser": {"schema": {"compatible": True}}},
+            redaction.redact_text(""),
+        )
+
+        self.assertEqual(result.diagnostics["publish_decision"], quality_gate.PUBLISH_PARTIAL)
+        self.assertEqual(result.diagnostics["coverage_status"], "partial")
+        self.assertEqual(result.diagnostics["skipped_file_count"], 1)
+
+    def test_quality_gate_blocks_redaction_failure(self) -> None:
+        result = quality_gate.evaluate_output_quality(
+            "Sensitive output.",
+            "[]",
+            0,
+            True,
+            False,
+            {"files": []},
+            {"resolved_command": "review"},
+            {"parser": {"schema": {"compatible": True}}, "redaction_failure": True},
+            redaction.redact_text(""),
+        )
+
+        self.assertEqual(result.diagnostics["publish_decision"], quality_gate.FAIL_BEFORE_PUBLISH)
+        self.assertEqual(result.diagnostics["reason"], "redaction_failed")
 
 
 class PromptParserRenderTests(unittest.TestCase):
@@ -929,6 +1549,15 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertFalse(result.parsed_ok)
         self.assertEqual(result.diagnostics["reason"], "missing_findings_json")
 
+    def test_parse_agent_output_reports_empty_cursor_output(self) -> None:
+        result = parser.parse_agent_output_result("   \n")
+
+        self.assertIn("Cursor returned empty output", result.markdown)
+        self.assertEqual(json.loads(result.findings_json), [])
+        self.assertFalse(result.parsed_ok)
+        self.assertEqual(result.diagnostics["reason"], "empty_output")
+        self.assertEqual(result.diagnostics["fallback"], "markdown")
+
     def test_build_repair_prompt_embeds_command_schema(self) -> None:
         prompt = parser.build_repair_prompt("describe", "<review_markdown>Summary</review_markdown>")
 
@@ -1000,6 +1629,38 @@ class PromptParserRenderTests(unittest.TestCase):
         self.assertIn("Language: `en`", rendered)
         self.assertIn("Language fallback used: `false`", rendered)
         self.assertNotIn("idioma", rendered.lower())
+
+    def test_render_comment_reports_config_diagnostics(self) -> None:
+        rendered = render.render_comment(
+            "No issues.",
+            "[]",
+            0,
+            "",
+            False,
+            True,
+            {"files": ["a.py"]},
+            {
+                "resolved_command": "review",
+                "model": "auto",
+                "filter_mode": "added",
+                "config_diagnostics": {
+                    "schema_version": config.CONFIG_SCHEMA_VERSION,
+                    "loaded": True,
+                    "unknown_key_count": 1,
+                    "fallback_count": 2,
+                    "warnings": [
+                        "Unknown config key `surprise_option` was ignored.",
+                        "Config `max_findings` expected an integer; using `5`.",
+                    ],
+                },
+            },
+        )
+
+        self.assertIn("Config schema: `config/v1`", rendered)
+        self.assertIn("Config loaded: `true`", rendered)
+        self.assertIn("Config unknown keys: `1`", rendered)
+        self.assertIn("Config fallback count: `2`", rendered)
+        self.assertIn("Config warning: `Unknown config key `surprise_option` was ignored.`", rendered)
 
     def test_render_comment_reports_ci_policy_diagnostics(self) -> None:
         rendered = render.render_comment(
@@ -1261,6 +1922,7 @@ class SupplyChainTests(unittest.TestCase):
     def test_release_and_dependency_docs_cover_required_supply_chain_gates(self) -> None:
         release_checklist = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
         dependencies = (ROOT / "docs" / "dependencies.md").read_text(encoding="utf-8")
+        release_notes = (ROOT / "docs" / "release-notes.md").read_text(encoding="utf-8")
 
         for doc in [release_checklist, dependencies]:
             self.assertIn("SUPPLY-CHAIN-P0", doc)
@@ -1271,6 +1933,73 @@ class SupplyChainTests(unittest.TestCase):
         self.assertIn("nanyang12138/cursor-review-action@v1", release_checklist)
         self.assertIn("actions/github-script@v7", dependencies)
         self.assertIn("scripts/install-cursor.sh", dependencies)
+        self.assertIn("docs/release-notes.md", release_checklist)
+
+        for required in [
+            "Release tag",
+            "Target commit",
+            "Completed capability IDs",
+            "Verification evidence",
+            "Known limitations and deferred non-goals",
+            "Dependency and supply-chain notes",
+            "Security and privacy notes",
+            "Upgrade and compatibility notes",
+        ]:
+            self.assertIn(required, release_notes)
+        self.assertIn("SUPPLY-CHAIN-P0", release_notes)
+        self.assertIn("TRACEABILITY-SCORECARD-P0", release_notes)
+        self.assertIn("PARSER-COMMAND-SCHEMA-P1", release_notes)
+        self.assertIn("nanyang12138/cursor-review-action@v1", release_notes)
+        self.assertIn("actions/checkout@v4", release_notes)
+        self.assertIn("actions/github-script@v7", release_notes)
+        self.assertIn("no auto-merge, no auto-release, no tag creation", release_notes)
+        self.assertIn("Full inline comments or inline suggestions", release_notes)
+        self.assertIn("Full PR-Agent product equivalence claims", release_notes)
+        self.assertNotIn("auto-create release tags", release_notes.lower())
+
+
+class FinalReadinessAuditTests(unittest.TestCase):
+    def test_final_readiness_audit_links_release_gates_and_human_boundaries(self) -> None:
+        audit = (ROOT / "docs" / "final-readiness-audit.md").read_text(encoding="utf-8")
+        release_checklist = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
+        release_notes = (ROOT / "docs" / "release-notes.md").read_text(encoding="utf-8")
+        mapping = (ROOT / "PR_AGENT_ENGINE_MAPPING.md").read_text(encoding="utf-8")
+        plan = (ROOT / "docs" / "plans" / "cursor-pr-agent-engine.plan.md").read_text(encoding="utf-8")
+
+        for capability_id in [
+            "SUPPLY-CHAIN-P0",
+            "TRACEABILITY-SCORECARD-P0",
+            "FIXTURE-HARNESS-P0",
+            "ACCEPTANCE-RUBRIC-P1",
+            "COMPARISON-PROTOCOL-P1",
+            "DOCS-POSITIONING-P1",
+        ]:
+            with self.subTest(capability_id=capability_id):
+                self.assertIn(capability_id, audit)
+
+        for gate in [
+            "Fixture regression",
+            "Release blockers",
+            "Compatibility",
+            "Security model",
+            "Supply chain",
+            "Cursor CLI diagnostics",
+            "Dogfooding and acceptance",
+            "Documentation",
+            "Release notes",
+        ]:
+            with self.subTest(gate=gate):
+                self.assertIn(f"| {gate} |", audit)
+
+        self.assertIn("no auto-merge, no auto-release, no tag creation", audit)
+        self.assertIn("python3 scripts/cursor_review.py --dry-run", audit)
+        self.assertIn("Cursor contacted: false", audit)
+        self.assertIn("No remaining allowed implementation work", audit)
+        self.assertIn("docs/final-readiness-audit.md", release_checklist)
+        self.assertIn("docs/final-readiness-audit.md", release_notes)
+        self.assertIn("docs/final-readiness-audit.md", mapping)
+        self.assertIn("final-readiness-audit", plan)
+        self.assertNotIn("status: pending", plan)
 
 
 class TriggerTrustPolicyTests(unittest.TestCase):
@@ -1354,8 +2083,48 @@ class FixtureRegressionTests(unittest.TestCase):
 
                 self.assertEqual(fixtures.validate_fixture(fixture, result), [])
 
+    def test_quality_gate_fixtures_match_prompt_parser_render_contract(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "quality_gate"
+        fixture_paths = fixtures.discover_fixture_paths(fixture_root)
+
+        self.assertGreaterEqual(len(fixture_paths), 1)
+        for fixture_path in fixture_paths:
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                result = fixtures.run_fixture(fixture)
+
+                self.assertEqual(fixtures.validate_fixture(fixture, result), [])
+
     def test_pr_regression_fixtures_have_capability_trace_files(self) -> None:
         fixture_root = ROOT / "tests" / "fixtures" / "pr_regression"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                capabilities_path = fixture_path.parent / "capabilities.txt"
+                self.assertTrue(capabilities_path.exists())
+                capabilities = [
+                    line.strip()
+                    for line in capabilities_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                self.assertEqual(capabilities, fixture["capability_ids"])
+
+    def test_quality_gate_fixtures_have_capability_trace_files(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "quality_gate"
+        for fixture_path in fixtures.discover_fixture_paths(fixture_root):
+            with self.subTest(fixture=fixture_path.parent.name):
+                fixture = fixtures.load_fixture(fixture_path)
+                capabilities_path = fixture_path.parent / "capabilities.txt"
+                self.assertTrue(capabilities_path.exists())
+                capabilities = [
+                    line.strip()
+                    for line in capabilities_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                self.assertEqual(capabilities, fixture["capability_ids"])
+
+    def test_config_invalid_fixtures_have_capability_trace_files(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "config_invalid"
         for fixture_path in fixtures.discover_fixture_paths(fixture_root):
             with self.subTest(fixture=fixture_path.parent.name):
                 fixture = fixtures.load_fixture(fixture_path)
@@ -1396,14 +2165,91 @@ class ComparisonProtocolTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertGreaterEqual(report.count("| sample-"), 5)
+        self.assertGreaterEqual(report.count("| sample-"), 10)
+        self.assertIn("This report now covers 12", report)
+        self.assertIn("Human acceptance rubric summary", report)
+        for field in [
+            "real_issue_found",
+            "false_positive_count",
+            "missed_issue_count",
+            "evidence_quality",
+            "command_intent_respected",
+            "output_conciseness",
+            "diagnostics_usefulness",
+            "skipped_content_transparency",
+            "follow_up_action",
+        ]:
+            self.assertIn(field, report)
         gap_sections = [section for section in report.split("\n### ") if section.startswith("GAP-")]
-        self.assertGreaterEqual(len(gap_sections), 5)
+        self.assertGreaterEqual(len(gap_sections), 10)
         for section in gap_sections:
             with self.subTest(gap=section.splitlines()[0]):
+                self.assertRegex(section, r"Status: (completed|deferred|non-goal documented)")
                 self.assertRegex(section, r"Decision: (backlog|deferred|non-goal)")
                 self.assertIn("Capability/status target:", section)
                 self.assertIn("Release impact:", section)
+
+
+class NonGoalsDocumentationTests(unittest.TestCase):
+    def test_non_goals_document_classifies_deferred_features(self) -> None:
+        doc = (ROOT / "docs" / "non-goals.md").read_text(encoding="utf-8")
+        normalized = " ".join(doc.split())
+
+        self.assertIn("NON-GOALS-P0", doc)
+        self.assertIn("DEFERRED-FEATURES-P1", doc)
+        for feature in [
+            "GitHub App server",
+            "Multi-platform providers",
+            "Auto-fix",
+            "Full inline comments",
+            "Labels derived from findings",
+            "Blocking merge policies",
+            "/cursor-describe` PR body mutation",
+            "Multi-call chunking",
+            "Second Cursor critique call",
+            "Ticket system",
+            "Ask on images",
+            "pull_request_target",
+        ]:
+            with self.subTest(feature=feature):
+                self.assertIn(feature, normalized)
+
+        self.assertIn("Do not copy PR-Agent source code", normalized)
+        self.assertIn("Require at least one no-Cursor test", normalized)
+        self.assertIn("The current README describes", normalized)
+
+    def test_readme_points_unsupported_behavior_to_non_goals(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+
+        self.assertIn("docs/non-goals.md", normalized)
+        self.assertIn("does not implement auto-fix", normalized)
+        self.assertIn("does not implement labels", normalized)
+        self.assertIn("does not implement multi-platform provider support", normalized)
+        self.assertIn("does not claim full PR-Agent product parity", normalized)
+
+
+class ReadmePositioningTests(unittest.TestCase):
+    def test_readme_documents_clean_room_cursor_native_positioning(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+
+        self.assertIn("clean-room, PR-Agent-inspired implementation", normalized)
+        self.assertIn("does not copy PR-Agent source code, prompts, schemas, tests, fixtures", normalized)
+        self.assertIn("Cursor CLI is the execution layer", normalized)
+        self.assertIn("GitHub Actions remains the distribution layer", normalized)
+        self.assertIn("Behavioral parity is tracked through capability IDs", normalized)
+
+    def test_readme_documents_public_compatibility_contract(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+
+        self.assertIn("## Compatibility Contract", readme)
+        self.assertIn("Stable action inputs include `cursor-api-key`", normalized)
+        self.assertIn("Stable outputs include `summary`, `findings-json`, `exit-code`", normalized)
+        self.assertIn("Stable repo config keys include `model`, `language`, `review_focus`", normalized)
+        self.assertIn("/cursor-review` is the default stable command", normalized)
+        self.assertIn("docs/release-checklist.md", normalized)
 
 
 class AcceptanceRubricTests(unittest.TestCase):
@@ -1565,6 +2411,7 @@ class EntrypointTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("No issues found.", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
+            self.assertIn("Lifecycle final state: `published`", (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8"))
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
             self.assertIn("comment_marker", (Path(tmp) / "outputs.txt").read_text(encoding="utf-8"))
@@ -1626,10 +2473,12 @@ class EntrypointTests(unittest.TestCase):
             self.assertIn("Stored dry-run result.", rendered)
             self.assertIn("Runner: `local_dry_run`", rendered)
             self.assertIn("Cursor contacted: `false`", rendered)
+            self.assertIn("Lifecycle final state: `published`", rendered)
             self.assertIn("Dry-run output source: `stored_file`", rendered)
             self.assertEqual(json.loads((root / "findings.json").read_text(encoding="utf-8")), [])
             self.assertEqual(diagnostics["mode"], "local_dry_run")
             self.assertFalse(diagnostics["cursor_contacted"])
+            self.assertEqual(diagnostics["lifecycle"]["final_state"], "published")
             self.assertIn("should_comment<<", outputs)
             self.assertIn("false", outputs)
 
@@ -1662,6 +2511,7 @@ class EntrypointTests(unittest.TestCase):
             rendered = (Path(tmp) / "cursor_review.md").read_text(encoding="utf-8")
             outputs = (Path(tmp) / "outputs.txt").read_text(encoding="utf-8")
             self.assertIn("untrusted_author_association", rendered)
+            self.assertIn("Lifecycle final state: `skipped`", rendered)
             self.assertIn("should_comment<<", outputs)
             self.assertIn("false", outputs)
 
@@ -1694,6 +2544,7 @@ class EntrypointTests(unittest.TestCase):
             outputs = (Path(tmp) / "outputs.txt").read_text(encoding="utf-8")
             self.assertIn("Cursor Review Action Help", rendered)
             self.assertIn("Cursor contacted: `false`", rendered)
+            self.assertIn("Lifecycle final state: `published`", rendered)
             self.assertNotIn("/cursor-improve -", rendered)
             self.assertEqual(json.loads((Path(tmp) / "findings.json").read_text(encoding="utf-8")), [])
             self.assertIn("resolved_command", outputs)

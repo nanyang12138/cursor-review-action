@@ -385,6 +385,20 @@ Validation checklist:
 - Large PR skipped file cannot produce an anchored finding unless the file was selected.
 - CI gating never treats invalid anchors as blocking findings.
 
+Implementation evidence:
+
+- `scripts/engine/diff_index.py` builds a `diff-index/v1` selected-diff line index
+  with new-side additions, old-side deletions, hunk headers, aliases, and skipped
+  file paths.
+- `scripts/engine/grounding.py` annotates parsed review findings with
+  `anchored`, `file_only`, `unanchored`, or `invalid` grounding status before
+  rendering, local dry-run output, fixture validation, or CI policy evaluation.
+- `tests/fixtures/pr_regression/security_finding` covers an anchored changed-line
+  finding; `tests/fixtures/pr_regression/invalid_finding_anchor` covers skipped
+  file invalid-anchor downgrade.
+- `docs/finding-grounding.md` documents selected-diff indexing, deleted-line
+  evidence, invalid-anchor downgrade, and diagnostics behavior.
+
 ### Publishing Strategy
 
 PR-Agent behavior to learn from:
@@ -1074,6 +1088,19 @@ Validation checklist:
 - Low-confidence unanchored findings do not displace high-confidence anchored findings.
 - Suppression diagnostics show counts without exposing raw prompt or raw diff.
 
+Implementation evidence:
+
+- `scripts/engine/findings.py` computes stable same-run fingerprints, removes
+  duplicate review findings, sorts retained findings by severity, confidence,
+  grounding quality, and actionability, then applies `max_findings`.
+- Live, local dry-run, and fixture paths run finding post-processing after
+  selected-diff grounding and before CI policy evaluation or rendering.
+- `tests/test_engine.py::FindingDedupTests` covers duplicate collapse,
+  severity/grounding ordering, and cap behavior; `tests/fixtures/pr_regression/duplicate_findings`
+  adds no-Cursor regression coverage.
+- `docs/finding-taxonomy.md` documents same-run deduplication diagnostics and
+  the no-raw-prompt/no-raw-diff logging boundary.
+
 ### Output Quality Gate and Self-Reflection Boundary
 
 PR-Agent behavior to learn from:
@@ -1133,6 +1160,23 @@ Validation checklist:
 - Unsupported claims are downgraded unless backed by selected context.
 - Quality gate output is included in no-Cursor fixtures.
 - Quality gate does not claim to prove findings are correct, only that they meet publication rules.
+
+Implementation evidence:
+
+- `scripts/engine/quality_gate.py` implements deterministic `output-quality-gate/v1`
+  diagnostics and publish decisions: `publish`, `publish_partial`,
+  `publish_with_diagnostics`, `suppress_findings`, and `fail_before_publish`.
+- Live, local dry-run, and fixture paths call the quality gate after parser,
+  grounding, deduplication, and redaction diagnostics, and before CI policy
+  evaluation or final rendering.
+- `tests/test_engine.py::OutputQualityGateTests` covers unsupported-claim
+  downgrade, partial-review decisions, and redaction-failure blocking.
+- `tests/fixtures/quality_gate/unsupported_claim` adds no-Cursor fixture coverage
+  proving unsupported external "tests passed" claims are downgraded and surfaced
+  in rendered diagnostics.
+- `docs/output-quality-gate.md` documents the deterministic decision model,
+  unsupported-claim boundary, diagnostics surfaces, and advisory/non-blocking
+  behavior.
 
 ### Repository Guidance and Best Practices Injection
 
@@ -1529,6 +1573,19 @@ Validation checklist:
 - Partial reviews clearly say why they are partial.
 - Persistent comment update includes run timestamp and head sha.
 
+Implementation evidence:
+
+- `scripts/engine/lifecycle.py` defines `review-lifecycle/v1` states and final
+  decision rules for `published`, `partial`, `failed`, and `skipped` runs.
+- Live, local dry-run, static help, disabled-command, and trigger-skip paths
+  attach final lifecycle diagnostics without adding progress comments or changing
+  public action inputs.
+- `docs/review-lifecycle.md` documents terminal state semantics, diagnostics
+  surfaces, compatibility boundaries, and P1/P2 deferrals.
+- `tests/test_engine.py::ReviewLifecycleTests` and entrypoint tests cover
+  lifecycle finalization, rendered diagnostics, trigger skip, help, and local
+  dry-run evidence.
+
 ### Multi-Stage Metadata Cache
 
 PR-Agent behavior to learn from:
@@ -1563,6 +1620,26 @@ Validation checklist:
 - Stale cache is identified by head sha.
 - Metadata cache content is redacted before publishing.
 - Commands can disable metadata reuse.
+
+Implementation evidence:
+
+- `scripts/engine/metadata_cache.py` defines `metadata-cache/v1` hidden markers,
+  generation from redacted `/cursor-describe` structured output, and validation
+  for schema version, source command, output schema, head SHA, enabled state, and
+  byte budget.
+- `action.yml` reads only the latest bot-owned describe metadata marker before
+  the Python engine runs, and publishes a new hidden marker only when describe
+  output passes local quality checks.
+- `scripts/engine/context.py` and `scripts/engine/prompts.py` inject validated
+  describe metadata into review/improve prompt context without changing selected
+  diff scope or raw PR comment behavior.
+- `scripts/engine/render.py` reports metadata cache diagnostics without exposing
+  cached content, raw prompts, raw diffs, or token-like strings.
+- `docs/metadata-cache.md` documents comment-only cache semantics, disable rules,
+  stale-cache fallback, diagnostics, privacy boundaries, and P2 deferrals.
+- `tests/test_engine.py::MetadataCacheTests` covers marker generation, redaction,
+  matching-head reuse, stale/disabled/not-applicable fallback, prompt injection,
+  and rendered diagnostics.
 
 ### Scope Control and Non-Goals
 
@@ -1601,6 +1678,19 @@ Validation checklist:
 - README does not imply unsupported behavior.
 - New feature requests are classified as P0/P1/P2/out-of-scope before implementation.
 
+Implementation evidence:
+
+- `docs/non-goals.md` records `NON-GOALS-P0` and `DEFERRED-FEATURES-P1` with
+  v1 non-goal, deferred, and out-of-scope classifications for GitHub App,
+  multi-platform providers, auto-fix, inline comments, labels, PR body mutation
+  by default, ticket integrations, multi-call chunking, second critique,
+  `pull_request_target`, and public full-parity claims.
+- `README.md` now points unsupported surfaces to `docs/non-goals.md` and keeps
+  the public positioning limited to implemented clean-room behavioral parity.
+- `tests/test_engine.py::NonGoalsDocumentationTests` verifies required deferred
+  features, clean-room boundaries, evidence requirements, and README limitation
+  language remain documented.
+
 ### Fixture Inventory Requirements
 
 PR-Agent behavior to learn from:
@@ -1609,7 +1699,11 @@ PR-Agent behavior to learn from:
 
 Current action:
 
-- Mentions 10-20 fixtures but does not define the minimum set.
+- Defines the minimum fixture inventory and tracks concrete no-Cursor fixtures
+  in `tests/fixtures/README.md` and `docs/parity-scorecard.md`.
+- As of the small-code-bug fixture, the suite has 20 concrete no-Cursor fixtures:
+  18 PR regression fixtures, 1 output quality gate fixture, and 1
+  config-invalid fixture.
 
 Cursor-native implementation:
 
@@ -1654,6 +1748,46 @@ Validation checklist:
 - Every P0 capability has at least one fixture.
 - Every fixture has capability IDs.
 - Fixtures cover both positive and negative cases.
+
+Implementation evidence:
+
+- `tests/fixtures/pr_regression/invalid_model_output` covers malformed model
+  `<findings_json>` and verifies parser fallback plus `publish_with_diagnostics`
+  output quality gate behavior without contacting Cursor.
+- `tests/fixtures/pr_regression/empty_cursor_output` covers empty Cursor stdout
+  and verifies safe markdown fallback, runner `output` diagnostics, retry
+  exhaustion, and `publish_with_diagnostics` quality gate behavior.
+- `tests/fixtures/config_invalid/bad_values` covers unknown config keys plus
+  invalid numeric, boolean, and filter-mode values, verifying safe fallback
+  diagnostics before Cursor is contacted.
+- `tests/fixtures/pr_regression/improve_suggestions` covers `/cursor-improve`
+  command-specific structured output plus general and improve-only repo guidance
+  diagnostics without repeating `/cursor-review` findings.
+- `tests/fixtures/pr_regression/deleted_line_anchor` covers deleted-only diff
+  evidence and verifies `old_line` / `line_side: old` grounding remains
+  publishable in summary comments while inline deleted-line comments stay
+  deferred.
+- `tests/fixtures/pr_regression/generated_lockfile_skipped` covers generated
+  asset and lockfile skipping while preserving source-wrapper review evidence.
+- `tests/fixtures/pr_regression/config_only_review` covers a configuration-only
+  PR and verifies effective config diagnostics, prompt context, and rendered
+  output without exposing the PR body.
+- `tests/fixtures/pr_regression/renamed_file_anchor` covers a renamed-file PR and
+  verifies old/new path aliases in the selected-diff index can anchor a new-side
+  finding without requiring inline comments.
+- `tests/fixtures/pr_regression/many_small_files_review` covers a many-small-files
+  PR and verifies max-file budget coverage, skipped-file transparency, and
+  selected-file anchor grounding across prioritized security/test/config context.
+- `tests/fixtures/pr_regression/missing_tests_review` covers a new billing
+  behavior branch without nearby regression coverage and verifies an actionable
+  `test_gap` finding with taxonomy, grounding, and quality-gate diagnostics.
+- `tests/fixtures/pr_regression/small_code_bug_review` covers a small
+  correctness bug PR and verifies an anchored `bug` finding on a selected
+  changed line with taxonomy, grounding, and quality-gate diagnostics.
+- `tests/fixtures/README.md` records the 20 concrete no-Cursor fixtures and the
+  completed `v1` fixture inventory target.
+- `docs/parity-scorecard.md` tracks `FIXTURE-HARNESS-P0` evidence and keeps the
+  remaining final-product fixture blockers visible.
 
 ### Quality and Regression
 
@@ -1916,7 +2050,8 @@ Purpose:
 
 Required:
 
-- 10-20 fixture PR cases.
+- 10-20 fixture PR cases. The `v0.5` volume floor is satisfied by 10 concrete
+  no-Cursor fixtures; `v1` still targets 20.
 - no-Cursor regression tests for config/context/diff/prompt/parser/render.
 - grounding fixtures cover valid, file-only, invalid, deleted-only, and skipped-file anchors.
 - deduplication fixtures cover duplicate and similar-but-distinct findings.
@@ -1952,6 +2087,28 @@ Required:
 - public README includes limitations and compatibility contract.
 - dogfooding has passed on this repository's own PRs.
 - no known high-severity failure in normal GitHub Actions usage.
+
+Implementation evidence:
+
+- `README.md` now documents `DOCS-POSITIONING-P1` with clean-room
+  PR-Agent-inspired boundaries, Cursor-native execution/distribution advantages,
+  behavioral-parity evidence links, a public compatibility contract, limitations,
+  and stable release-gate references.
+- `tests/test_engine.py::ReadmePositioningTests` verifies that README
+  positioning does not imply source/prompt/schema/test/fixture reuse, does not
+  claim full PR-Agent product parity, and keeps stable versus experimental
+  public surfaces visible.
+- `docs/parity-scorecard.md` records `DOCS-POSITIONING-P1` as a non-blocking
+  documentation capability while keeping stable release authority with human
+  review of release and dogfooding evidence.
+- `docs/final-readiness-audit.md` records the Final Product Hardening
+  release-readiness audit for `SUPPLY-CHAIN-P0`, `TRACEABILITY-SCORECARD-P0`,
+  `FIXTURE-HARNESS-P0`, `ACCEPTANCE-RUBRIC-P1`, `COMPARISON-PROTOCOL-P1`, and
+  `DOCS-POSITIONING-P1`, linking release checklist gates, release notes,
+  scorecard state, fixture/dogfooding evidence, and the no-auto-release policy.
+  It identifies no remaining allowed implementation work at the current mapping
+  layer; remaining stable-release actions are human review, optional live
+  dogfooding rerun, manual tag selection, and manual release publication.
 
 ## Compatibility Contract
 
@@ -1990,9 +2147,7 @@ Stable config keys:
 - `persistent_comment`
 - `enabled_commands`
 - `guidance_files`
-- `strict_args`
 - `timeout_seconds`
-- `language`
 - `fail_on_error`
 - `fail_on_findings`
 
@@ -2057,6 +2212,21 @@ Suggested files:
 - `.cursor-review.schema.json`
 - `scripts/engine/config_schema.py`
 - `tests/fixtures/config_invalid/`
+
+Implementation evidence:
+
+- `.cursor-review.schema.json` documents the stable repo-local
+  `.cursor-review.yml` surface with typed keys, integer minimums, supported
+  `filter_mode`, `scope_mode`, and `comment_mode` values, and explicit guidance
+  and metadata-cache budget fields.
+- `scripts/engine/config.py` continues to enforce runtime-safe loading with
+  `config/v1` diagnostics, unknown-key warnings, invalid-value fallback counts,
+  and redacted previews before Cursor is contacted.
+- `docs/config-migration.md` records the schema scope, workflow-input boundary,
+  and maintainer checklist for future config changes.
+- `tests/test_engine.py::ConfigSchemaDocumentationTests` verifies the schema is
+  valid JSON, covers the documented stable README config keys, and matches
+  runtime defaults and constraints for `CONFIG-SCHEMA-P1`.
 
 Schema principles:
 
@@ -2197,6 +2367,18 @@ Dogfooding gates:
 - No release tag without at least one self-review run.
 - No stable `v1` without fixtures derived from real self-review issues.
 - Every significant prompt change must add or update a fixture.
+
+Implementation evidence:
+
+- `docs/final-readiness-audit.md` identifies the long-lived goal PR `#29` /
+  `cursor/cursor-pr-agent-engine-goal-5865` as the self-review integration
+  surface for final hardening and records the local no-Cursor dogfooding dry-run
+  command that validates config, context, diff selection, parser, renderer,
+  lifecycle diagnostics, quality-gate diagnostics, and `Cursor contacted: false`
+  behavior before human release review.
+- `tests/fixtures/pr_regression/*/human_eval.md` and
+  `docs/parity-reports/2026-05-12-initial-gap-log.md` provide acceptance-rubric
+  records for fixture and comparison scenarios without copying PR-Agent output.
 
 ## Resolved Open Questions
 
@@ -2361,7 +2543,8 @@ Allowed examples:
 --comment-only
 ```
 
-Unknown args warn or fail according to `strict_args`.
+Unknown args warn and remain in the user prompt; strict failure mode is not part
+of the current stable repo config surface.
 
 ### Cursor CLI Timeout
 

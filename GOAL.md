@@ -23,6 +23,14 @@ Product Completion Mode.
 
 The automation should continue until the final product goal is complete. It should not stop at P0, P1, or the first stable release gate if the plan still allows final-product work.
 
+Current automation status: `docs/final-readiness-audit.md`,
+`PR_AGENT_ENGINE_MAPPING.md`, and `docs/plans/cursor-pr-agent-engine.plan.md`
+now identify no remaining allowed implementation work at the current plan layer.
+Remaining actions are human release-review actions only: final checklist review,
+optional live dogfooding rerun, manual tag selection, and manual release
+publication. Automation must still never auto-merge, auto-release, create tags,
+or publish releases.
+
 Phase order:
 
 1. Phase 1: Engine Split

@@ -4,11 +4,18 @@ from string import Template
 from typing import Any, Dict
 
 from .config import split_csv
-from .schemas import schema_contract_for_prompt, schema_for_command
+from .schemas import output_schema_for_command, schema_contract_for_prompt, schema_for_command
 
 
 TEMPLATE_DIR = Path(__file__).with_name("prompt_templates")
 SUPPORTED_TEMPLATE_COMMANDS = {"review", "ask", "improve", "describe"}
+
+
+def prompt_template_version() -> str:
+    version_path = TEMPLATE_DIR / "VERSION"
+    if not version_path.exists():
+        return "prompt-template-unknown"
+    return version_path.read_text(encoding="utf-8").strip() or "prompt-template-unknown"
 
 
 def template_path_for_command(command: str) -> Path:
@@ -17,35 +24,63 @@ def template_path_for_command(command: str) -> Path:
 
 
 def load_command_template(command: str) -> Template:
-    return Template(template_path_for_command(command).read_text(encoding="utf-8"))
+    raw_template = template_path_for_command(command).read_text(encoding="utf-8")
+    raw_template = raw_template.replace("{{schema_json}}", "$schema")
+    return Template(raw_template)
+
+
+def format_guidance_for_prompt(repo_guidance: Dict[str, Any]) -> str:
+    sections = repo_guidance.get("sections") or []
+    formatted = []
+    for section in sections:
+        content = str(section.get("content") or "").strip()
+        if not content:
+            continue
+        label = str(section.get("path") or section.get("kind") or "repo guidance")
+        kind = str(section.get("kind") or "general")
+        formatted.append(f"### {label} ({kind})\n{content}")
+    return "\n\n".join(formatted)
+
+
+def format_describe_metadata_for_prompt(describe_metadata: Dict[str, Any]) -> str:
+    if not describe_metadata:
+        return ""
+    return json.dumps(describe_metadata, ensure_ascii=False, indent=2)
 
 
 def command_instructions(command: str, user_prompt: str, settings: Dict[str, Any]) -> str:
-    template = COMMAND_TEMPLATES.get(command, COMMAND_TEMPLATES["review"])
     language = settings.get("language", "zh-CN")
     max_findings = settings.get("max_findings", 5)
     focus = ", ".join(split_csv(settings.get("review_focus")))
-    output_schema = output_schema_for_command(command)
-    output_schema_text = json.dumps(output_schema, ensure_ascii=False, indent=2)
+    # Keep the concrete output schema reachable for prompt-shape tests and future
+    # diagnostics without changing the template placeholder contract.
+    output_schema_for_command(command)
 
     extra = ""
     if user_prompt:
         extra = f"\nAdditional user instructions from PR comment:\n{user_prompt}\n"
 
     template = load_command_template(command)
-    return template.safe_substitute(
+    rendered = template.safe_substitute(
         language=language,
         max_findings=max_findings,
         focus=focus,
         user_instructions=extra,
         schema=schema_contract_for_prompt(command),
     )
+    language_contract = (
+        f"Write all human-readable prose in {language}.\n"
+        "Do not translate JSON field names, XML-style wrapper tags, diagnostics keys, or schema values."
+    )
+    return f"{language_contract}\n\n{rendered}"
 
 
 def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, truncated: bool, meta: Dict[str, Any], settings: Dict[str, Any]) -> str:
     pull_request_context = meta.get("pull_request_context", {})
     repo_guidance = meta.get("repo_guidance") or {"sections": [], "diagnostics": {}}
     guidance_prompt = format_guidance_for_prompt(repo_guidance)
+    describe_metadata = meta.get("describe_metadata") or {}
+    describe_metadata_prompt = format_describe_metadata_for_prompt(describe_metadata)
     diagnostics = {
         "command": command,
         "prompt_template": template_path_for_command(command).name,
@@ -56,10 +91,18 @@ def build_prompt(command: str, user_prompt: str, diff_text: str, stat: str, trun
         "command_arg_overrides": settings.get("command_arg_overrides", {}),
         "command_arg_warnings": settings.get("command_arg_warnings", []),
         "repo_guidance": repo_guidance.get("diagnostics", {}),
+        "metadata_cache": meta.get("metadata_cache", {}),
+        "prompt_template_version": prompt_template_version(),
         "diff_truncated": truncated,
         "diff_meta": meta,
     }
     guidance_section = f"\nRepository guidance:\n{guidance_prompt}\n" if guidance_prompt else ""
+    describe_metadata_section = (
+        "\nCached describe metadata from this PR head SHA:\n"
+        f"{describe_metadata_prompt}\n"
+        if describe_metadata_prompt
+        else ""
+    )
     return f"""{command_instructions(command, user_prompt, settings)}
 
 Diagnostics:
@@ -68,6 +111,7 @@ Diagnostics:
 Pull request context:
 {json.dumps(pull_request_context, ensure_ascii=False, indent=2)}
 {guidance_section}
+{describe_metadata_section}
 
 Diff stat:
 {stat}

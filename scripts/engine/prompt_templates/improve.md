@@ -10,6 +10,6 @@ Response contract:
 1. Wrap the human-readable improvement suggestions in <review_markdown>...</review_markdown>.
 2. Wrap machine-readable suggestions in <findings_json>...</findings_json>.
 3. findings_json must be a JSON array matching this command schema:
-$schema
+{{schema_json}}
 4. If there are no useful improvements, return an empty JSON array and say so clearly in review_markdown.
 5. Do not claim that tests, security scans, performance benchmarks, deployments, or external tickets were verified unless the provided context proves it.

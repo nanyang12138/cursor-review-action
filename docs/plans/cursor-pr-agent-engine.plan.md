@@ -121,31 +121,34 @@ todos:
     status: completed
   - id: review-lifecycle
     content: 建立 queued/context/diff/cursor/parser/published/failed/partial 生命周期状态和 diagnostics
-    status: pending
+    status: completed
   - id: metadata-cache
     content: 定义 describe metadata 复用规则，必须按 command/head sha/schema version 校验并允许禁用
-    status: pending
+    status: completed
   - id: non-goals
     content: 文档化 v1 前不做的 PR-Agent 周边能力，避免 GitHub App、多平台、auto-fix、inline suggestion 等范围膨胀
-    status: pending
+    status: completed
   - id: fixture-inventory
     content: 建立最低 fixture inventory，覆盖 docs-only、安全、大 PR、invalid config、fork PR、invalid model output 等正反案例
-    status: pending
+    status: completed
   - id: finding-grounding
     content: 建立 selected-diff line index，验证 parsed findings 的 file/line/evidence anchor，并降级 invalid anchors
-    status: pending
+    status: completed
   - id: finding-dedup
     content: 对同轮 findings 做 normalization、fingerprint、dedup、severity/confidence/grounding 排序，再应用 max_findings 或 CI gating
-    status: pending
+    status: completed
   - id: trigger-trust-policy
     content: 建立 trigger policy matrix，在 context construction 和 Cursor call 前处理 fork PR、issue_comment author association、workflow_dispatch、rerun 和 untrusted trigger
     status: completed
   - id: output-quality-gate
     content: 在 render/publish 前统一执行 schema、grounding、taxonomy、confidence、dedup、redaction、unsupported-claim 质量门禁并产出 publish decision
-    status: pending
+    status: completed
   - id: docs-positioning
     content: 更新 README，说明 clean-room PR-Agent-inspired architecture 与 Cursor-native 优势
-    status: pending
+    status: completed
+  - id: final-readiness-audit
+    content: 补齐最终产品硬化审计，串联 release checklist、release notes、scorecard、fixture/dogfooding evidence 和人工发布边界
+    status: completed
 isProject: false
 ---
 
@@ -456,7 +459,40 @@ flowchart TD
 - Redaction failure 会阻止 raw comment publishing。
 - 当前未决问题全部已有默认决策，且记录在 `PR_AGENT_ENGINE_MAPPING.md` 的 `Resolved Open Questions` 与 Round K。
 - `v0.5` fixture gate 明确为 10 个 concrete fixtures，`v1` 目标为 20 个。
+- `v0.5` fixture volume gate 与 `v1` fixture inventory target 已由 20 个
+  no-Cursor concrete fixtures 覆盖，其中
+  invalid config 与 empty Cursor output 负向夹具已验证 safe fallback diagnostics，
+  improve/repo-guidance 夹具已验证 `/cursor-improve` schema 与 guidance diagnostics，
+  deleted-only、generated/lockfile 与 config-only 夹具已验证 anchor/skipped-file/config
+  diagnostics，renamed-file 夹具已验证 old/new path alias grounding，
+  many-small-file 夹具已验证 max-file budget coverage 与 selected-file anchoring；
+  small-code-bug 夹具已验证 anchored `bug` taxonomy、selected-line grounding
+  与 quality-gate publishable diagnostics。
 - `file_only`、deleted-only、partial review、untrusted command、quality gate output 都有默认渲染/诊断策略。
+- Metadata cache P1 已实现为 describe comment hidden marker：review/improve 仅在
+  schema、source command、output schema、head SHA、启用状态和大小预算全部通过时复用，
+  缺失、过期、禁用或无效缓存都会安全回退到当前 PR context。
+- `CONFIG-SCHEMA-P1` 已补齐 `.cursor-review.schema.json`，覆盖稳定 repo-local
+  配置键、预算字段、枚举值和 guidance/metadata-cache 边界；workflow-only
+  PR metadata 仍保留在 action inputs 中，运行时继续通过 `config/v1`
+  diagnostics 处理 unknown keys 与 safe fallbacks。
+- `COMPARISON-PROTOCOL-P1` 的初始 gap log 已按当前实现证据刷新到 12 个
+  repository-owned clean-room 样本，覆盖 review/ask/improve/describe、
+  parser fallback、empty output、generated/lockfile、invalid anchor、dedup、
+  config-only 与 trigger trust 场景；所有 gap 均分类为 completed backlog、
+  deferred 或 non-goal，并保留人工稳定发布 review gate。
+- `docs/non-goals.md` 已记录 `NON-GOALS-P0` 与 `DEFERRED-FEATURES-P1`，
+  明确 GitHub App、多平台、auto-fix、inline comments、labels、ticket
+  integration、默认 PR body mutation、multi-call chunking、second critique、
+  full PR-Agent parity claims 等 v1 非目标或延后能力，并由文档测试约束。
+- README 已记录 `DOCS-POSITIONING-P1`，说明 clean-room PR-Agent-inspired
+  边界、Cursor-native 架构优势、稳定兼容契约、实验命令边界与 release
+  gate 链接，并由 `ReadmePositioningTests` 约束。
+- `docs/final-readiness-audit.md` 已记录最终产品硬化审计，把
+  `SUPPLY-CHAIN-P0`、`TRACEABILITY-SCORECARD-P0`、`FIXTURE-HARNESS-P0`、
+  `ACCEPTANCE-RUBRIC-P1`、`COMPARISON-PROTOCOL-P1` 和
+  `DOCS-POSITIONING-P1` 的 release readiness 证据连接到 checklist、
+  release notes、scorecard、fixture/dogfooding 记录和人工发布边界。
 - Release checklist 通过后才能打稳定 tag。
 - README 明确说明这是 clean-room Cursor-native PR Agent，不复制 PR-Agent 代码。
 
@@ -481,6 +517,15 @@ flowchart TD
 - Partial review：使用醒目 degraded heading 和 coverage warning。
 - Unsupported claims：P0 覆盖测试、安全、性能、部署/运行时、外部 issue/ticket/customer 状态。
 - Quality gate output：进入 `findings-json` 和 Actions summary，PR comment 放 compact diagnostics。
+
+## 当前自动化实现状态
+
+- No remaining allowed implementation work is identified at the current plan
+  layer.
+- 剩余动作是人工发布 review：维护者复核 final readiness audit、release
+  checklist、release notes、scorecard 和 dogfooding evidence，然后才可手动
+  选择 tag/release。
+- Automation 仍不得 auto-merge、auto-release、创建 release 或创建 tag。
 
 ## 当前重新打开条件
 

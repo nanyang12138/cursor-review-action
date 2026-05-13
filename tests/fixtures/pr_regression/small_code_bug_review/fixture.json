@@ -1,0 +1,78 @@
+{
+  "name": "small_code_bug_review",
+  "capability_ids": [
+    "PROMPT-REVIEW-P0",
+    "FINDING-TAXONOMY-P0",
+    "FINDING-GROUNDING-P0",
+    "OUTPUT-QUALITY-GATE-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "correctness",
+    "max_findings": 3
+  },
+  "context": {
+    "diff_text": "diff --git a/src/orders/total.py b/src/orders/total.py\n@@ -1,5 +1,7 @@\n def calculate_total(items, discount):\n     subtotal = sum(item.price for item in items)\n+    if discount:\n+        return subtotal - discount.amount\n     tax = subtotal * 0.08\n     return subtotal + tax\n",
+    "stat": " src/orders/total.py | 2 ++",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/orders/total.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/orders/total.py",
+          "bytes": 217,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [],
+      "pull_request_context": {
+        "pr_number": "119",
+        "title": "Apply order discounts before checkout",
+        "body": "Adds a discount branch to the order total calculation.",
+        "base_ref": "main",
+        "head_ref": "feature/order-discount",
+        "commit_messages": [
+          "Apply discounts in total calculation"
+        ],
+        "changed_files": [
+          "src/orders/total.py"
+        ],
+        "diff_stat": "src/orders/total.py | 2 ++"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>The new discount branch returns before tax is added, so discounted orders can skip tax entirely.</review_markdown>\n<findings_json>[{\"schema_version\":\"cursor-review-finding/v1\",\"category\":\"bug\",\"severity\":\"medium\",\"confidence\":\"high\",\"file\":\"src/orders/total.py\",\"line\":4,\"title\":\"Discount path returns before tax is applied\",\"body\":\"The added discount branch exits the function before the existing tax calculation, so any discounted order returns subtotal minus the discount without adding tax.\",\"suggestion\":\"Apply the discount to the subtotal, then continue through the existing tax calculation before returning the final total.\",\"evidence\":\"return subtotal - discount.amount\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "Review focus: correctness.",
+      "\"changed_files\": [",
+      "src/orders/total.py"
+    ],
+    "markdown_contains": [
+      "discount branch returns before tax is added"
+    ],
+    "rendered_contains": [
+      "discount branch returns before tax is added",
+      "Files reviewed: `1`",
+      "Taxonomy normalized findings: `1`",
+      "Grounding anchored findings: `1`",
+      "Quality gate publishable findings: `1`"
+    ],
+    "findings_json_contains": [
+      "\"category\": \"bug\"",
+      "\"noise_control\": \"actionable_review\"",
+      "\"grounding_status\": \"anchored\"",
+      "\"grounding_reason\": \"new_changed_line\""
+    ]
+  }
+}

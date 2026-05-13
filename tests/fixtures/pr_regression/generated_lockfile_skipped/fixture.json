@@ -1,0 +1,81 @@
+{
+  "name": "generated_lockfile_skipped",
+  "capability_ids": [
+    "DIFF-GENERATED-P0",
+    "PROMPT-REVIEW-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "max_findings": 5
+  },
+  "context": {
+    "diff_text": "diff --git a/src/app.py b/src/app.py\n@@ -10,3 +10,4 @@ def handler(request):\n     validate(request)\n+    return build_response(request.user)\n",
+    "stat": " src/app.py | 1 +\n package-lock.json | 500 +++++++++++++++++++++++++\n dist/app.min.js | 1 +",
+    "truncated": false,
+    "meta": {
+      "files": [
+        "src/app.py"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/app.py",
+          "bytes": 139,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [
+        {
+          "path": "package-lock.json",
+          "reason": "generated_or_lockfile"
+        },
+        {
+          "path": "dist/app.min.js",
+          "reason": "generated_or_lockfile"
+        }
+      ],
+      "pull_request_context": {
+        "pr_number": "114",
+        "title": "Regenerate frontend assets",
+        "body": "Touches a small source wrapper plus generated package artifacts.",
+        "base_ref": "main",
+        "head_ref": "feature/generated-assets",
+        "commit_messages": [
+          "Regenerate frontend assets"
+        ],
+        "changed_files": [
+          "src/app.py",
+          "package-lock.json",
+          "dist/app.min.js"
+        ],
+        "diff_stat": "src/app.py | 1 +"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>No actionable issues found in the selected source diff.</review_markdown>\n<findings_json>[]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 0,
+    "prompt_contains": [
+      "\"path\": \"package-lock.json\"",
+      "\"reason\": \"generated_or_lockfile\"",
+      "\"path\": \"dist/app.min.js\""
+    ],
+    "markdown_contains": [
+      "selected source diff"
+    ],
+    "rendered_contains": [
+      "No actionable issues found in the selected source diff.",
+      "Files reviewed: `1`",
+      "Files skipped: `2`"
+    ],
+    "rendered_not_contains": [
+      "Touches a small source wrapper plus generated package artifacts."
+    ]
+  }
+}

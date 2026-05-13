@@ -1,0 +1,121 @@
+{
+  "name": "many_small_files_review",
+  "capability_ids": [
+    "DIFF-LARGE-P0",
+    "BUDGET-CONTROLS-P1",
+    "PROMPT-REVIEW-P0",
+    "FINDING-GROUNDING-P0",
+    "FIXTURE-HARNESS-P0"
+  ],
+  "command": "review",
+  "settings": {
+    "language": "en",
+    "model": "auto",
+    "filter_mode": "added",
+    "review_focus": "security,tests",
+    "max_files": 3,
+    "max_hunks": 6,
+    "max_findings": 3
+  },
+  "context": {
+    "diff_text": "diff --git a/src/auth/session.py b/src/auth/session.py\n@@ -1,3 +1,4 @@\n def create_session(user):\n+    session[\"role\"] = request.args.get(\"role\", \"user\")\n     return session\ndiff --git a/tests/test_session.py b/tests/test_session.py\n@@ -8,3 +8,4 @@ def test_create_session_defaults_to_user():\n     session = create_session(user)\n+    assert session[\"role\"] == \"admin\"\n     assert session[\"user_id\"] == user.id\ndiff --git a/config/security.yml b/config/security.yml\n@@ -1,3 +1,4 @@\n auth:\n+  allow_query_role_override: true\n   require_mfa: true\n",
+    "stat": " src/auth/session.py | 1 +\n tests/test_session.py | 1 +\n config/security.yml | 1 +\n docs/session.md | 1 +\n scripts/dev_seed.py | 1 +\n changelog.md | 1 +",
+    "truncated": true,
+    "meta": {
+      "files": [
+        "src/auth/session.py",
+        "tests/test_session.py",
+        "config/security.yml"
+      ],
+      "reviewed_files": [
+        {
+          "path": "src/auth/session.py",
+          "bytes": 178,
+          "hunks": 1,
+          "status": "included"
+        },
+        {
+          "path": "tests/test_session.py",
+          "bytes": 174,
+          "hunks": 1,
+          "status": "included"
+        },
+        {
+          "path": "config/security.yml",
+          "bytes": 117,
+          "hunks": 1,
+          "status": "included"
+        }
+      ],
+      "skipped_files": [
+        {
+          "path": "docs/session.md",
+          "reason": "max_files"
+        },
+        {
+          "path": "scripts/dev_seed.py",
+          "reason": "max_files"
+        },
+        {
+          "path": "changelog.md",
+          "reason": "max_files"
+        }
+      ],
+      "budget": {
+        "max_diff_bytes": 60000,
+        "max_files": 3,
+        "max_hunks": 6,
+        "max_cursor_calls": 1
+      },
+      "truncation_reasons": [
+        "max_files"
+      ],
+      "pull_request_context": {
+        "pr_number": "117",
+        "title": "Touch many session-related files",
+        "body": "Updates session behavior, tests, config, docs, and development helpers in one small-file PR.",
+        "base_ref": "main",
+        "head_ref": "feature/session-many-files",
+        "commit_messages": [
+          "Update session role handling across files"
+        ],
+        "changed_files": [
+          "src/auth/session.py",
+          "tests/test_session.py",
+          "config/security.yml",
+          "docs/session.md",
+          "scripts/dev_seed.py",
+          "changelog.md"
+        ],
+        "diff_stat": "6 files changed, 6 insertions"
+      }
+    }
+  },
+  "agent_output": "<review_markdown>Found a security-sensitive session role issue in the selected files.</review_markdown>\n<findings_json>[{\"schema_version\":\"cursor-review-finding/v1\",\"category\":\"security\",\"severity\":\"high\",\"confidence\":\"high\",\"file\":\"src/auth/session.py\",\"line\":2,\"title\":\"Do not derive session roles from query parameters\",\"body\":\"The new session role assignment trusts a request query parameter, allowing callers to request elevated roles when sessions are created.\",\"suggestion\":\"Use server-side authorization data for session roles and keep request parameters out of role assignment.\",\"evidence\":\"session[\\\"role\\\"] = request.args.get(\\\"role\\\", \\\"user\\\")\"}]</findings_json>",
+  "expected": {
+    "parsed_ok": true,
+    "findings_type": "array",
+    "findings_count": 1,
+    "prompt_contains": [
+      "\"changed_files\": [",
+      "docs/session.md",
+      "\"truncation_reasons\": [",
+      "max_files"
+    ],
+    "markdown_contains": [
+      "security-sensitive session role issue"
+    ],
+    "rendered_contains": [
+      "security-sensitive session role issue",
+      "Files reviewed: `3`",
+      "Files skipped: `3`",
+      "Budget max files: `3`",
+      "Grounding anchored findings: `1`"
+    ],
+    "findings_json_contains": [
+      "\"file\": \"src/auth/session.py\"",
+      "\"grounding_status\": \"anchored\"",
+      "\"grounding_reason\": \"new_changed_line\""
+    ]
+  }
+}

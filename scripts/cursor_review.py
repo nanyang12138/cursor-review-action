@@ -9,10 +9,23 @@ from engine.command_args import parse_command_args
 from engine.commands import derive_command_and_prompt, ensure_command_enabled
 from engine.context import build_review_context
 from engine.config import load_settings
+from engine.findings import postprocess_findings_json
+from engine.grounding import ground_findings_json
 from engine.help import render_help
+from engine.lifecycle import (
+    CALLING_CURSOR,
+    COLLECTING_CONTEXT,
+    PARSING_OUTPUT,
+    SELECTING_DIFF,
+    advance_lifecycle,
+    finalize_lifecycle,
+    start_lifecycle,
+)
 from engine.local_dry_run import run_local_dry_run, write_local_dry_run_artifacts
+from engine.metadata_cache import build_describe_metadata_cache_comment
 from engine.parser import build_repair_prompt, parse_agent_output_result
 from engine.prompts import build_prompt, prompt_template_version
+from engine.quality_gate import evaluate_output_quality
 from engine.redaction import combine_results, redact_text
 from engine.render import render_comment, render_trigger_skip, set_output, write_step_summary
 from engine.runner import run_cursor_result
@@ -43,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     settings["resolved_user_prompt"] = user_prompt
     run_state = build_run_state(settings)
     settings["run_state"] = run_state["metadata"]
+    settings["lifecycle"] = start_lifecycle(command, run_state["metadata"])
     set_output("resolved_command", command)
     set_output("comment_marker", run_state["comment_marker"])
     set_output("comment_title", run_state["comment_title"])
@@ -50,6 +64,13 @@ def main(argv: list[str] | None = None) -> int:
     set_output("run_metadata_comment", run_state["metadata_comment"])
 
     if command == "help":
+        settings["lifecycle"] = finalize_lifecycle(
+            settings["lifecycle"],
+            explicit_state="published",
+            reason="static_help",
+            cursor_contacted=False,
+            should_comment=True,
+        )
         rendered = render_help(settings)
         ci_policy = evaluate_ci_policy(0, "[]", settings)
         Path("cursor_review.md").write_text(rendered, encoding="utf-8")
@@ -78,7 +99,28 @@ def main(argv: list[str] | None = None) -> int:
 
     enabled, message = ensure_command_enabled(command, settings)
     if not enabled:
-        rendered = f"{message}\n"
+        settings["lifecycle"] = finalize_lifecycle(
+            settings["lifecycle"],
+            exit_code=78,
+            explicit_state="failed",
+            reason="command_disabled",
+            failure_stage="command_enabled_check",
+            cursor_contacted=False,
+            should_comment=True,
+        )
+        rendered = f"""{message}
+
+<details>
+<summary>Cursor Review Diagnostics</summary>
+
+- Lifecycle schema: `{settings["lifecycle"].get("schema_version")}`
+- Lifecycle final state: `{settings["lifecycle"].get("final_state")}`
+- Lifecycle reason: `{settings["lifecycle"].get("reason")}`
+- Lifecycle stages: `{" -> ".join(settings["lifecycle"].get("state_sequence") or [])}`
+- Cursor contacted: `false`
+
+</details>
+"""
         ci_policy = evaluate_ci_policy(78, "[]", settings)
         set_output("summary", rendered)
         set_output("findings_json", "[]")
@@ -104,6 +146,13 @@ def main(argv: list[str] | None = None) -> int:
     trigger_decision = evaluate_trigger_trust(settings)
     settings["trigger_trust"] = trigger_decision.diagnostics
     if not trigger_decision.allowed:
+        settings["lifecycle"] = finalize_lifecycle(
+            settings["lifecycle"],
+            explicit_state="skipped",
+            reason=trigger_decision.diagnostics.get("reason", "trigger_not_allowed"),
+            cursor_contacted=False,
+            should_comment=trigger_decision.should_comment,
+        )
         rendered = render_trigger_skip(trigger_decision.diagnostics, settings)
         ci_policy = evaluate_ci_policy(78, "[]", settings)
         Path("cursor_review.md").write_text(rendered, encoding="utf-8")
@@ -117,7 +166,9 @@ def main(argv: list[str] | None = None) -> int:
         write_step_summary(rendered)
         return int(ci_policy["workflow_exit_code"])
 
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], COLLECTING_CONTEXT, "building_review_context")
     context = build_review_context(settings)
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], SELECTING_DIFF, "selected_review_diff")
     settings["prompt_template_version"] = prompt_template_version()
     prompt = build_prompt(
         command,
@@ -131,12 +182,14 @@ def main(argv: list[str] | None = None) -> int:
     if settings.get("debug_artifacts"):
         Path("cursor_review_prompt.txt").write_text(redact_text(prompt).text, encoding="utf-8")
 
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], CALLING_CURSOR, "calling_cursor_cli")
     runner_result = run_cursor_result(prompt, settings)
     exit_code = runner_result.exit_code
     stdout = runner_result.raw_text
     stderr = runner_result.stderr
     raw_output = stdout + ("\n\nSTDERR:\n" + stderr if stderr else "")
 
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], PARSING_OUTPUT, "parsing_cursor_output")
     parse_result = parse_agent_output_result(stdout, command)
     markdown = parse_result.markdown
     findings_json = parse_result.findings_json
@@ -175,9 +228,13 @@ def main(argv: list[str] | None = None) -> int:
 
     runner_diagnostics["cursor_calls_attempted"] = cursor_calls_attempted
     runner_diagnostics["retry_count"] = parser_diagnostics.get("repair_retry_count", 0)
+    grounding_result = ground_findings_json(findings_json, context.meta.get("diff_index") or {}, command)
+    findings_json = grounding_result.findings_json
+    parser_diagnostics["grounding"] = grounding_result.diagnostics
+    findings_result = postprocess_findings_json(findings_json, settings, command)
+    findings_json = findings_result.findings_json
+    parser_diagnostics["findings"] = findings_result.diagnostics
     runner_diagnostics["parser"] = parser_diagnostics
-    ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
-    runner_diagnostics["ci_policy"] = ci_policy
     markdown_redaction = redact_text(markdown)
     findings_redaction = redact_text(findings_json)
     stderr_redaction = redact_text(stderr)
@@ -193,6 +250,39 @@ def main(argv: list[str] | None = None) -> int:
     markdown = markdown_redaction.text
     findings_json = findings_redaction.text
     stderr = stderr_redaction.text
+    quality_result = evaluate_output_quality(
+        markdown,
+        findings_json,
+        exit_code,
+        parsed_ok,
+        context.truncated,
+        context.meta,
+        settings,
+        runner_diagnostics,
+        runner_diagnostics["redaction"],
+    )
+    findings_json = quality_result.findings_json
+    parser_diagnostics["quality_gate"] = quality_result.diagnostics
+    runner_diagnostics["quality_gate"] = quality_result.diagnostics
+    metadata_cache_comment, metadata_cache_diagnostics = build_describe_metadata_cache_comment(
+        command,
+        findings_json,
+        settings,
+        quality_result.diagnostics,
+    )
+    runner_diagnostics["metadata_cache"] = metadata_cache_diagnostics
+    ci_policy = evaluate_ci_policy(exit_code, findings_json, settings)
+    runner_diagnostics["ci_policy"] = ci_policy
+    settings["lifecycle"] = finalize_lifecycle(
+        settings["lifecycle"],
+        exit_code=exit_code,
+        parsed_ok=parsed_ok,
+        diff_truncated=context.truncated,
+        quality_gate=quality_result.diagnostics,
+        cursor_contacted=True,
+        should_comment=True,
+        failure_stage="calling_cursor" if exit_code != 0 else "",
+    )
     if settings.get("debug_artifacts"):
         Path("cursor_review_raw.txt").write_text(raw_output_redaction.text, encoding="utf-8")
     rendered = render_comment(
@@ -211,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
 
     set_output("summary", rendered)
     set_output("findings_json", findings_json)
+    set_output("metadata_cache_comment", metadata_cache_comment)
     set_output("ci_policy_json", ci_policy_json(ci_policy))
     set_output("exit_code", str(exit_code))
     set_output("diff_truncated", str(context.truncated).lower())

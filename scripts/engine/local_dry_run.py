@@ -6,8 +6,20 @@ from typing import Any, Dict, Optional
 from .budget import normalized_budget_settings
 from .ci_policy import evaluate_ci_policy
 from .context import build_review_context
+from .findings import postprocess_findings_json
+from .grounding import ground_findings_json
+from .lifecycle import (
+    COLLECTING_CONTEXT,
+    PARSING_OUTPUT,
+    SELECTING_DIFF,
+    advance_lifecycle,
+    finalize_lifecycle,
+    start_lifecycle,
+)
 from .parser import parse_agent_output_result
 from .prompts import build_prompt, prompt_template_version
+from .quality_gate import evaluate_output_quality
+from .redaction import combine_results, redact_text
 from .render import render_comment
 from .schemas import SCHEMA_VERSION
 
@@ -83,8 +95,12 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
     settings["local_dry_run"] = True
     settings["cursor_api_key_present"] = False
     settings["prompt_template_version"] = prompt_template_version()
+    if not settings.get("lifecycle"):
+        settings["lifecycle"] = start_lifecycle(command, settings.get("run_state") or {})
 
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], COLLECTING_CONTEXT, "building_review_context")
     context = build_review_context(settings)
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], SELECTING_DIFF, "selected_review_diff")
     prompt = build_prompt(
         command,
         str(settings.get("resolved_user_prompt") or ""),
@@ -95,15 +111,25 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
         settings,
     )
     output = load_dry_run_agent_output(command, output_path)
+    settings["lifecycle"] = advance_lifecycle(settings["lifecycle"], PARSING_OUTPUT, "parsing_dry_run_output")
     parse_result = parse_agent_output_result(output["raw_output"], command)
+    grounding_result = ground_findings_json(parse_result.findings_json, context.meta.get("diff_index") or {}, command)
+    findings_json = grounding_result.findings_json
+    findings_result = postprocess_findings_json(findings_json, settings, command)
+    findings_json = findings_result.findings_json
     parser_diagnostics = dict(parse_result.diagnostics)
+    parser_diagnostics["grounding"] = grounding_result.diagnostics
+    parser_diagnostics["findings"] = findings_result.diagnostics
     parser_diagnostics["repair_retry_count"] = 0
     parser_diagnostics["dry_run_output_source"] = output["source"]
     if output["path"]:
         parser_diagnostics["dry_run_output_path"] = output["path"]
 
     budgets = normalized_budget_settings(settings)
-    ci_policy = evaluate_ci_policy(0, parse_result.findings_json, settings)
+    markdown_redaction = redact_text(parse_result.markdown)
+    findings_redaction = redact_text(findings_json)
+    output_redaction = redact_text(output["raw_output"])
+    redaction_summary = combine_results([markdown_redaction, findings_redaction, output_redaction])
     runner_diagnostics = {
         "runner": "local_dry_run",
         "failure_kind": "none",
@@ -113,16 +139,41 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
         "max_cursor_calls": budgets["max_cursor_calls"],
         "cursor_contacted": False,
         "parser": parser_diagnostics,
-        "ci_policy": ci_policy,
+        "redaction": redaction_summary,
         "dry_run": {
             "enabled": True,
             "output_source": output["source"],
             "output_path": output["path"],
         },
     }
+    quality_result = evaluate_output_quality(
+        markdown_redaction.text,
+        findings_redaction.text,
+        0,
+        parse_result.parsed_ok,
+        context.truncated,
+        context.meta,
+        settings,
+        runner_diagnostics,
+        redaction_summary,
+    )
+    findings_json = quality_result.findings_json
+    parser_diagnostics["quality_gate"] = quality_result.diagnostics
+    runner_diagnostics["quality_gate"] = quality_result.diagnostics
+    ci_policy = evaluate_ci_policy(0, findings_json, settings)
+    runner_diagnostics["ci_policy"] = ci_policy
+    settings["lifecycle"] = finalize_lifecycle(
+        settings["lifecycle"],
+        exit_code=0,
+        parsed_ok=parse_result.parsed_ok,
+        diff_truncated=context.truncated,
+        quality_gate=quality_result.diagnostics,
+        cursor_contacted=False,
+        should_comment=False,
+    )
     rendered = render_comment(
-        parse_result.markdown,
-        parse_result.findings_json,
+        markdown_redaction.text,
+        findings_json,
         0,
         "",
         context.truncated,
@@ -142,12 +193,13 @@ def run_local_dry_run(settings: Dict[str, Any], output_path: Optional[str] = Non
         "dry_run_output_source": output["source"],
         "parser": parser_diagnostics,
         "ci_policy": ci_policy,
+        "lifecycle": settings["lifecycle"],
     }
     return LocalDryRunResult(
         rendered=rendered,
-        findings_json=parse_result.findings_json,
+        findings_json=findings_json,
         prompt=prompt,
-        raw_output=output["raw_output"],
+        raw_output=output_redaction.text,
         parsed_ok=parse_result.parsed_ok,
         diff_truncated=context.truncated,
         ci_policy=ci_policy,

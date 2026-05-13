@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
+from .lifecycle import lifecycle_diagnostics
 from .redaction import combine_results, privacy_diagnostics, redact_text
 from .taxonomy import taxonomy_summary
 
@@ -31,6 +32,29 @@ def _run_state_diagnostics(settings: Dict[str, Any]) -> List[str]:
     return diagnostics
 
 
+def _lifecycle_diagnostics(settings: Dict[str, Any]) -> List[str]:
+    lifecycle = settings.get("lifecycle") or {}
+    if not lifecycle:
+        return []
+    diagnostic = lifecycle_diagnostics(lifecycle)
+    lines = [
+        f"- Lifecycle schema: `{diagnostic.get('schema_version', 'unknown')}`",
+        f"- Lifecycle final state: `{diagnostic.get('final_state', 'unknown')}`",
+        f"- Lifecycle reason: `{diagnostic.get('reason', 'unknown')}`",
+        f"- Lifecycle stages: `{' -> '.join(diagnostic.get('state_sequence') or []) or 'unknown'}`",
+        f"- Lifecycle terminal: `{str(diagnostic.get('terminal', False)).lower()}`",
+        f"- Lifecycle cursor contacted: `{str(diagnostic.get('cursor_contacted', False)).lower()}`",
+        f"- Lifecycle should comment: `{str(diagnostic.get('should_comment', True)).lower()}`",
+    ]
+    if diagnostic.get("partial_reason"):
+        lines.append(f"- Lifecycle partial reason: `{diagnostic.get('partial_reason')}`")
+    if diagnostic.get("failed_stage"):
+        lines.append(f"- Lifecycle failed stage: `{diagnostic.get('failed_stage')}`")
+    if diagnostic.get("publish_decision"):
+        lines.append(f"- Lifecycle publish decision: `{diagnostic.get('publish_decision')}`")
+    return lines
+
+
 def _localization_diagnostics(settings: Dict[str, Any]) -> List[str]:
     localization = settings.get("language_diagnostics") or {}
     if not localization:
@@ -57,6 +81,7 @@ def render_trigger_skip(trigger_diagnostics: Dict[str, Any], settings: Dict[str,
     ]
     diagnostics.extend(_localization_diagnostics(settings))
     diagnostics.extend(_run_state_diagnostics(settings))
+    diagnostics.extend(_lifecycle_diagnostics(settings))
     return f"""Cursor review skipped before contacting Cursor.
 
 Reason: `{trigger_diagnostics.get('reason', 'unknown')}`.
@@ -107,6 +132,7 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         f"- Cursor exit code: `{exit_code}`",
     ]
     diagnostics.extend(_run_state_diagnostics(settings))
+    diagnostics.extend(_lifecycle_diagnostics(settings))
     parser_diagnostics = runner_diagnostics.get("parser") or {}
     if parser_diagnostics:
         diagnostics.append(f"- Parser reason: `{parser_diagnostics.get('reason', 'unknown')}`")
@@ -126,6 +152,35 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
             diagnostics.append(f"- Output schema command match: `{str(schema_diagnostics.get('command_match', True)).lower()}`")
         for label, value in taxonomy_summary(parser_diagnostics.get("taxonomy") or {}):
             diagnostics.append(f"- {label}: `{str(value).lower() if isinstance(value, bool) else value}`")
+        grounding = parser_diagnostics.get("grounding") or {}
+        if grounding:
+            diagnostics.append(f"- Grounding schema: `{grounding.get('schema_version', 'unknown')}`")
+            diagnostics.append(f"- Grounding applied: `{str(grounding.get('applied', False)).lower()}`")
+            diagnostics.append(f"- Diff index schema: `{grounding.get('diff_index_schema_version', 'unknown')}`")
+            diagnostics.append(f"- Grounding anchored findings: `{grounding.get('anchored_count', 0)}`")
+            diagnostics.append(f"- Grounding file-only findings: `{grounding.get('file_only_count', 0)}`")
+            diagnostics.append(f"- Grounding unanchored findings: `{grounding.get('unanchored_count', 0)}`")
+            diagnostics.append(f"- Invalid anchor count: `{grounding.get('invalid_anchor_count', 0)}`")
+            diagnostics.append(f"- Skipped-file finding count: `{grounding.get('skipped_file_finding_count', 0)}`")
+        findings = parser_diagnostics.get("findings") or {}
+        if findings:
+            diagnostics.append(f"- Finding dedup schema: `{findings.get('schema_version', 'unknown')}`")
+            diagnostics.append(f"- Finding dedup applied: `{str(findings.get('applied', False)).lower()}`")
+            diagnostics.append(f"- Finding input count: `{findings.get('input_count', 0)}`")
+            diagnostics.append(f"- Finding duplicate count: `{findings.get('duplicate_count', 0)}`")
+            diagnostics.append(f"- Finding capped count: `{findings.get('capped_count', 0)}`")
+            diagnostics.append(f"- Finding output count: `{findings.get('output_count', 0)}`")
+        quality_gate = parser_diagnostics.get("quality_gate") or runner_diagnostics.get("quality_gate") or {}
+        if quality_gate:
+            diagnostics.append(f"- Quality gate schema: `{quality_gate.get('schema_version', 'unknown')}`")
+            diagnostics.append(f"- Quality gate decision: `{quality_gate.get('publish_decision', 'unknown')}`")
+            diagnostics.append(f"- Quality gate reason: `{quality_gate.get('reason', 'unknown')}`")
+            diagnostics.append(f"- Quality gate coverage: `{quality_gate.get('coverage_status', 'unknown')}`")
+            diagnostics.append(f"- Quality gate publishable findings: `{quality_gate.get('publishable_finding_count', 0)}`")
+            diagnostics.append(f"- Quality gate human-verification findings: `{quality_gate.get('human_verification_finding_count', 0)}`")
+            diagnostics.append(f"- Quality gate suppressed findings: `{quality_gate.get('suppressed_finding_count', 0)}`")
+            diagnostics.append(f"- Quality gate unsupported claims: `{quality_gate.get('unsupported_claim_count', 0)}`")
+            diagnostics.append(f"- Quality gate redaction status: `{quality_gate.get('redaction_status', 'unknown')}`")
         if parser_diagnostics.get("repair_skipped_reason"):
             diagnostics.append(f"- Parser repair skipped: `{parser_diagnostics.get('repair_skipped_reason')}`")
         if "repair_succeeded" in parser_diagnostics:
@@ -164,9 +219,27 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
         diagnostics.append(f"- CI findings gate status: `{ci_policy.get('findings_gate_status', 'unknown')}`")
         diagnostics.append(f"- CI workflow exit code: `{ci_policy.get('workflow_exit_code', 0)}`")
         diagnostics.append(f"- CI policy reason: `{ci_policy.get('reason', 'unknown')}`")
+        diagnostics.append(f"- CI gating eligible findings: `{ci_policy.get('gating_eligible_finding_count', ci_policy.get('finding_count', 0))}`")
         diagnostics.append(f"- CI high severity findings: `{ci_policy.get('high_severity_finding_count', 0)}`")
+    config_diagnostics = settings.get("config_diagnostics") or {}
+    if config_diagnostics:
+        diagnostics.append(f"- Config schema: `{config_diagnostics.get('schema_version', 'unknown')}`")
+        diagnostics.append(f"- Config loaded: `{str(config_diagnostics.get('loaded', False)).lower()}`")
+        diagnostics.append(f"- Config unknown keys: `{config_diagnostics.get('unknown_key_count', 0)}`")
+        diagnostics.append(f"- Config fallback count: `{config_diagnostics.get('fallback_count', 0)}`")
+        for warning in config_diagnostics.get("warnings") or []:
+            diagnostics.append(f"- Config warning: `{warning}`")
     if settings.get("config_loaded"):
         diagnostics.append(f"- Config: `{settings.get('config_loaded')}`")
+    metadata_cache = meta.get("metadata_cache") or runner_diagnostics.get("metadata_cache") or {}
+    if metadata_cache:
+        diagnostics.append(f"- Metadata cache schema: `{metadata_cache.get('schema_version', 'unknown')}`")
+        diagnostics.append(f"- Metadata cache enabled: `{str(metadata_cache.get('enabled', False)).lower()}`")
+        diagnostics.append(f"- Metadata cache status: `{metadata_cache.get('status', 'unknown')}`")
+        diagnostics.append(f"- Metadata cache reason: `{metadata_cache.get('reason', 'unknown')}`")
+        diagnostics.append(f"- Metadata cache source: `{metadata_cache.get('source', 'none')}`")
+        diagnostics.append(f"- Metadata cache head match: `{str(metadata_cache.get('head_sha_match', False)).lower()}`")
+        diagnostics.append(f"- Metadata cache bytes: `{metadata_cache.get('bytes', 0)}`")
     privacy = privacy_diagnostics(settings, redaction_summary)
     diagnostics.append(f"- Privacy redaction schema: `{privacy.get('schema_version')}`")
     diagnostics.append(f"- Redaction status: `{privacy.get('redaction_status')}`")
@@ -215,8 +288,16 @@ def render_comment(markdown: str, findings_json: str, exit_code: int, stderr: st
 ```
 """
 
+    quality_gate = (runner_diagnostics.get("parser") or {}).get("quality_gate") or runner_diagnostics.get("quality_gate") or {}
     warning = ""
-    if truncated:
+    if quality_gate.get("publish_decision") == "fail_before_publish":
+        markdown = "Cursor review output was not published because the deterministic quality gate blocked it before publishing."
+    elif quality_gate.get("publish_decision") == "publish_partial":
+        reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
+        warning = f"\n> **Partial Cursor Review**: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
+    elif quality_gate.get("publish_decision") == "suppress_findings":
+        warning = "\n> Findings were suppressed by the deterministic output quality gate; see diagnostics for the suppression reason.\n"
+    elif truncated:
         reasons = ", ".join(meta.get("truncation_reasons") or ["budget"])
         warning = f"\n> Note: The selected diff was limited by `{reasons}`, so this review may not cover every changed line.\n"
 
