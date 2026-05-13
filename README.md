@@ -187,7 +187,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cursor review
-        uses: nanyang12138/cursor-review-action@main
+        uses: nanyang12138/cursor-review-action@v1.0.0
         with:
           cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
           github-token: ${{ github.token }}
@@ -208,13 +208,14 @@ jobs:
           language: zh-CN
 ```
 
-Until the first stable release is published, use:
+Use a stable version tag for repeatable workflow behavior:
 
 ```yaml
-uses: nanyang12138/cursor-review-action@main
+uses: nanyang12138/cursor-review-action@v1.0.0
 ```
 
-After `v1` is released, prefer:
+If you maintain the moving major tag, keep `@v1` pointing at the latest stable
+`v1.x` release:
 
 ```yaml
 uses: nanyang12138/cursor-review-action@v1
@@ -227,16 +228,21 @@ the action without inheriting every PR-Agent feature:
 
 - Stable action inputs include `cursor-api-key`, `github-token`, `base-sha`,
   `head-sha`, `pr-number`, `event-name`, `comment-body`, `model`, `language`,
-  `comment-mode`, and `persistent-comment`.
+  `max-findings`, `max-diff-bytes`, `max-files`, `max-hunks`,
+  `max-cursor-calls`, `timeout-seconds`, `scope-mode`, `scope-files`,
+  `comment-mode`, `persistent-comment`, and `install-cursor`.
 - Stable outputs include `summary`, `findings-json`, `exit-code`,
-  `diff-truncated`, and `comment-url`.
+  `ci-policy-json`, `diff-truncated`, `resolved-command`, `should-comment`,
+  and `comment-url`.
 - Stable repo config keys include `model`, `language`, `review_focus`,
-  `max_findings`, `max_diff_bytes`, `filter_mode`, `include_patterns`,
-  `exclude_patterns`, `persistent_comment`, `enabled_commands`,
-  `guidance_files`, `timeout_seconds`, `fail_on_error`, and `fail_on_findings`.
-- `/cursor-review` is the default stable command. `/cursor-ask`,
-  `/cursor-improve`, and `/cursor-describe` are available through explicit
-  command enablement while their UX continues to be validated.
+  `max_findings`, `max_diff_bytes`, `max_files`, `max_hunks`,
+  `max_cursor_calls`, `timeout_seconds`, `filter_mode`, `scope_mode`,
+  `scope_files`, `include_patterns`, `exclude_patterns`, `persistent_comment`,
+  `enabled_commands`, `guidance_files`, `fail_on_error`, and
+  `fail_on_findings`.
+- `/cursor-review` is the default stable command. The recommended configuration
+  also enables `/cursor-ask`, `/cursor-improve`, and `/cursor-describe`. For the
+  most conservative setup, keep only `review` in `enabled_commands`.
 - Findings are advisory by default. The action does not approve, merge, release,
   tag, or block PRs unless maintainers add separate workflow policy.
 
@@ -297,9 +303,9 @@ review_focus:
   - edge-cases
 max_findings: 5
 max_diff_bytes: 120000
+timeout_seconds: 600
 filter_mode: added
 scope_mode: full
-scope_files: ""
 persistent_comment: true
 enabled_commands:
   - review
@@ -307,12 +313,14 @@ enabled_commands:
   - improve
   - describe
 skip_generated_files: true
-include_patterns: []
 exclude_patterns:
   - "*.lock"
   - "dist/**"
   - "build/**"
 ```
+
+The recommended configuration enables all Cursor-backed commands. For the most
+conservative setup, keep only `review` under `enabled_commands`.
 
 Configuration precedence:
 
@@ -407,6 +415,9 @@ Important inputs:
 - `review-focus`: Comma-separated review focus list.
 - `max-findings`: Maximum actionable findings. Default: `5`.
 - `max-diff-bytes`: Maximum diff size sent to Cursor. Default: `120000`.
+- `max-files`: Maximum changed files included in the selected diff. Default: `0` for unlimited.
+- `max-hunks`: Maximum diff hunks included in the selected diff. Default: `0` for unlimited.
+- `max-cursor-calls`: Maximum Cursor CLI calls for one action run. Default: `1`.
 - `timeout-seconds`: Per-call Cursor CLI timeout in seconds. Default: `600`.
 - `filter-mode`: `added`, `diff_context`, or `file`.
 - `include-patterns` / `exclude-patterns`: Comma-separated file globs.
@@ -417,6 +428,7 @@ Important inputs:
 - `fail-on-error`: Fail the job when Cursor review fails. Default: `false`.
 - `fail-on-findings`: Preserved for compatibility but not enforced without a future explicit severity-threshold contract.
 - `debug-artifacts`: Write redacted live-run prompt/raw-output debug files. Default: `false`.
+- `install-cursor`: Install Cursor CLI before running review. Default: `true`.
 
 ## Commands
 
