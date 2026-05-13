@@ -55,6 +55,16 @@ def _is_allowed_module(module: str, stdlib_modules: Set[str]) -> bool:
     )
 
 
+def _display_path(path: Path, root: Optional[Path] = None) -> str:
+    display = path
+    if root:
+        try:
+            display = path.resolve().relative_to(root)
+        except ValueError:
+            display = path
+    return display.as_posix()
+
+
 def discover_python_files(paths: Sequence[Path]) -> List[Path]:
     files: List[Path] = []
     for path in paths:
@@ -91,18 +101,13 @@ def scan_stdlib_imports(paths: Sequence[Path], repo_root: Optional[Path] = None)
 
             for module in modules:
                 if not _is_allowed_module(module, stdlib_modules):
-                    display_path = str(file_path)
-                    if root:
-                        try:
-                            display_path = str(file_path.resolve().relative_to(root))
-                        except ValueError:
-                            display_path = str(file_path)
+                    display_path = _display_path(file_path, root)
                     violations.append(ImportViolation(display_path, module, getattr(node, "lineno", 0)))
 
     return {
         "schema_version": SCHEMA_VERSION,
         "stdlib_only": not violations,
-        "scanned_files": [str(path.resolve().relative_to(root)) if root else str(path) for path in files],
+        "scanned_files": [_display_path(path, root) for path in files],
         "external_imports": [
             {"file": violation.file, "module": violation.module, "line": violation.line}
             for violation in violations

@@ -33,17 +33,23 @@ def diff_range(settings: Dict[str, Any]) -> Tuple[str, str, str]:
     if base and head:
         return base, head, f"{base}...{head}"
 
-    rev_parse = run_command(["git", "rev-parse", "--verify", "HEAD~1"], check=False)
+    try:
+        rev_parse = run_command(["git", "rev-parse", "--verify", "HEAD~1"], check=False)
+    except FileNotFoundError:
+        return "", "HEAD", "HEAD"
     if rev_parse.returncode == 0:
         return "HEAD~1", "HEAD", "HEAD~1...HEAD"
     return "", "HEAD", "HEAD"
 
 
 def changed_files(base: str, head: str) -> List[str]:
-    if base and head:
-        result = run_command(["git", "diff", "--name-only", f"{base}...{head}"], check=False)
-    else:
-        result = run_command(["git", "show", "--name-only", "--format=", "HEAD"], check=False)
+    try:
+        if base and head:
+            result = run_command(["git", "diff", "--name-only", f"{base}...{head}"], check=False)
+        else:
+            result = run_command(["git", "show", "--name-only", "--format=", "HEAD"], check=False)
+    except FileNotFoundError:
+        return []
     if result.returncode != 0:
         return []
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]

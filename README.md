@@ -407,6 +407,7 @@ Important inputs:
 - `review-focus`: Comma-separated review focus list.
 - `max-findings`: Maximum actionable findings. Default: `5`.
 - `max-diff-bytes`: Maximum diff size sent to Cursor. Default: `120000`.
+- `timeout-seconds`: Per-call Cursor CLI timeout in seconds. Default: `600`.
 - `filter-mode`: `added`, `diff_context`, or `file`.
 - `include-patterns` / `exclude-patterns`: Comma-separated file globs.
 - `scope-mode`: `full` or `files`. Default: `full`.
