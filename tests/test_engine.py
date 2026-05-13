@@ -2446,6 +2446,9 @@ class EntrypointTests(unittest.TestCase):
                 encoding="utf-8",
             )
             env = {
+                "PATH": os.environ.get("PATH", ""),
+                "PATHEXT": os.environ.get("PATHEXT", ""),
+                "SystemRoot": os.environ.get("SystemRoot", ""),
                 "INPUT_COMMAND": "review",
                 "INPUT_ENABLED_COMMANDS": "review",
                 "INPUT_CONFIG_PATH": ".cursor-review.yml",
