@@ -62,6 +62,30 @@ publishing a PR comment.
 
 ## Automation verification snapshots
 
+### 2026-05-13 00:20 UTC
+
+- Goal PR: `#29` / `cursor/cursor-pr-agent-engine-goal-5865`
+- Active phase: Final Product Hardening / release-readiness verification
+- Selected milestone: final readiness verification refresh for the completed
+  current plan layer
+- Capability IDs verified: `SUPPLY-CHAIN-P0`,
+  `TRACEABILITY-SCORECARD-P0`, `FIXTURE-HARNESS-P0`,
+  `ACCEPTANCE-RUBRIC-P1`, `COMPARISON-PROTOCOL-P1`,
+  `DOCS-POSITIONING-P1`
+- Verification:
+  - `python3 -m unittest tests/test_engine.py` passed with 121 tests.
+  - `python3 -m compileall scripts tests` passed.
+  - `python3 scripts/cursor_review.py --dry-run` passed with
+    `Cursor contacted: false`, lifecycle state `partial`, quality gate
+    decision `publish_partial`, and exit code `0`.
+  - `git diff --check` and `git diff --check HEAD~1 HEAD` passed.
+- Evidence notes: the dry-run used the existing long-lived goal PR branch
+  against `origin/main`; the partial state was caused by the configured
+  selected-diff budget and produced the expected coverage diagnostics rather
+  than a failure.
+- Release policy: no auto-merge, no tag creation, and no release publication
+  were performed.
+
 ### 2026-05-13 00:02 UTC
 
 - Goal PR: `#29` / `cursor/cursor-pr-agent-engine-goal-5865`
