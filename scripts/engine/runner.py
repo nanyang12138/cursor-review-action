@@ -1,4 +1,6 @@
+import os
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -52,12 +54,36 @@ def _timeout_seconds(settings: Dict[str, Any]) -> int:
     return normalized_budget_settings(settings)["timeout_seconds"]
 
 
+def _write_prompt_file(prompt: str) -> str:
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        prefix="cursor-review-prompt-",
+        suffix=".txt",
+        delete=False,
+    ) as handle:
+        handle.write(prompt)
+        return handle.name
+
+
+def _prompt_file_reference(prompt_file: str) -> str:
+    return f"Read the full cursor-review prompt from this file and follow it exactly: {prompt_file}"
+
+
+def _remove_prompt_file(prompt_file: str) -> None:
+    try:
+        os.unlink(prompt_file)
+    except OSError:
+        pass
+
+
 def run_cursor_result(prompt: str, settings: Dict[str, Any]) -> CursorRunResult:
     model = str(settings.get("model", "auto"))
     command_name = str(settings.get("resolved_command") or settings.get("command") or "review")
     budgets = normalized_budget_settings(settings)
     timeout_seconds = _timeout_seconds(settings)
-    command = ["agent", "-p", "--trust", "--model", model, "--output-format", "text", prompt]
+    prompt_file = _write_prompt_file(prompt)
+    command = ["agent", "-p", "--trust", "--model", model, "--output-format", "text", _prompt_file_reference(prompt_file)]
     started = time.monotonic()
     stdout = ""
     stderr = ""
@@ -65,20 +91,23 @@ def run_cursor_result(prompt: str, settings: Dict[str, Any]) -> CursorRunResult:
     timed_out = False
 
     try:
-        result = run_command(command, check=False, timeout=timeout_seconds)
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        exit_code = result.returncode
-    except FileNotFoundError:
-        exit_code = 127
-        stderr = "Cursor CLI `agent` was not found. Enable install-cursor or install Cursor CLI first."
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        exit_code = 124
-        stdout = exc.stdout or ""
-        stderr = f"Cursor CLI timed out after {timeout_seconds} seconds."
-        if exc.stderr:
-            stderr = f"{stderr}\n{exc.stderr}"
+        try:
+            result = run_command(command, check=False, timeout=timeout_seconds)
+            stdout = result.stdout or ""
+            stderr = result.stderr or ""
+            exit_code = result.returncode
+        except FileNotFoundError:
+            exit_code = 127
+            stderr = "Cursor CLI `agent` was not found. Enable install-cursor or install Cursor CLI first."
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            exit_code = 124
+            stdout = exc.stdout or ""
+            stderr = f"Cursor CLI timed out after {timeout_seconds} seconds."
+            if exc.stderr:
+                stderr = f"{stderr}\n{exc.stderr}"
+    finally:
+        _remove_prompt_file(prompt_file)
 
     duration_seconds = time.monotonic() - started
     failure_kind = _classify_failure(exit_code, stdout, stderr, timed_out=timed_out)
