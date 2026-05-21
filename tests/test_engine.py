@@ -2316,7 +2316,7 @@ class RunnerContractTests(unittest.TestCase):
 
         def fake_run_command(command, check=False, timeout=None):
             nonlocal captured_prompt_file
-            self.assertTrue(all(arg != prompt for arg in command))
+            self.assertTrue(all(prompt not in arg for arg in command))
             prompt_references = [arg for arg in command if "cursor-review-prompt-" in arg]
             self.assertEqual(len(prompt_references), 1)
             captured_prompt_file = prompt_references[0].rsplit(" ", 1)[-1]
