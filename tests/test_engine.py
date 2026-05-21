@@ -2309,6 +2309,28 @@ class RunnerContractTests(unittest.TestCase):
         run_command.assert_called_once()
         self.assertEqual(run_command.call_args.kwargs["timeout"], 600)
 
+    def test_run_cursor_result_passes_prompt_via_temp_file(self) -> None:
+        prompt = "Review these files:\n" + "\n".join(f"src/generated/file_{index}.py" for index in range(5000))
+        completed = mock.Mock(returncode=0, stdout="ok", stderr="")
+        captured_prompt_file = ""
+
+        def fake_run_command(command, check=False, timeout=None):
+            nonlocal captured_prompt_file
+            self.assertTrue(all(prompt not in arg for arg in command))
+            prompt_references = [arg for arg in command if "cursor-review-prompt-" in arg]
+            self.assertEqual(len(prompt_references), 1)
+            captured_prompt_file = prompt_references[0].rsplit(" ", 1)[-1]
+            self.assertTrue(os.path.exists(captured_prompt_file))
+            with open(captured_prompt_file, encoding="utf-8") as handle:
+                self.assertEqual(handle.read(), prompt)
+            return completed
+
+        with mock.patch.object(runner, "run_command", side_effect=fake_run_command):
+            result = runner.run_cursor_result(prompt, {"model": "auto", "resolved_command": "review"})
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertFalse(os.path.exists(captured_prompt_file))
+
     def test_run_cursor_result_classifies_install_failure(self) -> None:
         with mock.patch.object(runner, "run_command", side_effect=FileNotFoundError()):
             result = runner.run_cursor_result("prompt", {"model": "auto"})
